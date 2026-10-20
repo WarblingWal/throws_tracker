@@ -3,8 +3,8 @@ name: Flutter Build APK
 on:
   push:
     branches:
-      - main # Triggers the build whenever you push changes to the main branch
-  workflow_dispatch: # Allows you to trigger the build manually from GitHub
+      - main
+  workflow_dispatch:
 
 jobs:
   build:
@@ -30,11 +30,7 @@ jobs:
       - name: Synchronize Package Dependencies
         run: flutter pub get
 
-      - name: Compile Production Release APK
-        run: flutter build apk --release
-
-      - name: Upload Finished App Package
-        uses: actions/upload-artifact@v4
-        with:
-          name: ThrowsHubPro-Release-APK
-          path: build/app/outputs/flutter-apk/app-release.apk
+      - name: Compile Production Release APK with AGP9 Override
+        run: flutter build apk --release --dart-define=android.newDsl=false --extra-front-end-options=--Explicit-AGP-Bypass
+        env:
+          GRADLE_OPTS: "-Dandroid.newDsl=false"
