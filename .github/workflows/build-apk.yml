@@ -30,7 +30,7 @@ jobs:
       - name: Synchronize Package Dependencies
         run: flutter pub get
 
-      - name: Compile Production Release APK with AGP9 Override
-        run: flutter build apk --release --dart-define=android.newDsl=false --extra-front-end-options=--Explicit-AGP-Bypass
+      - name: Compile Production Release APK with Validation Bypass
+        run: flutter build apk --release --android-skip-build-dependency-validation
         env:
           GRADLE_OPTS: "-Dandroid.newDsl=false"
