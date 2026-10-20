@@ -1,0 +1,44 @@
+name: Build Android APK
+
+on:
+  push:
+    branches:
+      - main  # Change to master if your primary branch is called master
+  workflow_dispatch: # Allows you to run the build manually from the GitHub UI
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java Environment
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.x'
+          channel: 'stable'
+          cache: true
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      - name: Build APK (Debug/Unsigned)
+        run: flutter build apk --debug
+
+      - name: Rename Output APK
+        run: mv build/app/outputs/flutter-apk/app-debug.apk build/app/outputs/flutter-apk/throws_tracker_v1_beta.apk
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Throws-Tracker-v1-Beta  # The name of the downloaded ZIP folder
+          path: build/app/outputs/flutter-apk/throws_tracker_v1_beta.apk  # The custom-named file inside
+          retention-days: 7
