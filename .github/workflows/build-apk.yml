@@ -30,5 +30,7 @@ jobs:
       - name: Synchronize Package Dependencies
         run: flutter pub get
 
-      - name: Compile Production Release APK with Validation Bypass
+      - name: Compile Production Release APK with Toolchain Environment Overrides
         run: flutter build apk --release --android-skip-build-dependency-validation
+        env:
+          GRADLE_OPTS: "-Dandroid.newDsl=false -Dandroid.suppressUnsupportedCompileSdk=true"
