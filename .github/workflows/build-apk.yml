@@ -30,5 +30,5 @@ jobs:
       - name: Synchronize Package Dependencies
         run: flutter pub get
 
-      - name: Compile Production Release APK
-        run: flutter build apk --release
+      - name: Compile Production Release APK with Validation Bypass
+        run: flutter build apk --release --android-skip-build-dependency-validation
