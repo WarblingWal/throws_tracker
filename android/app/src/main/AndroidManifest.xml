@@ -4,7 +4,7 @@
     <uses-permission android:name="android.permission.INTERNET" />
 
     <application
-        android:label="Throws Hub Pro"
+        android:label="Throws Hub Force"
         android:icon="@mipmap/ic_launcher">
         
         <activity
