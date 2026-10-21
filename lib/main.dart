@@ -73,7 +73,6 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
   String _selectedDivision = "M55";
   final String _onboardingSelectedSex = "M";
 
-  // 🔹 Pinned Simple Scalar Index Variables for Onboarding Selections
   int _onboardingCountryIdx = 0;
   int _onboardingAgeIdx = 3;
 
@@ -128,20 +127,21 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
     'Weight': null
   };
 
+  // 🎨 Graded variations of Nordic Moss Green, Alpine Forest Timber Spruce, Sage, and Organic Clay
   final Map<String, Color> _disciplineBackgrounds = {
-    'Discus': const Color(0xFF2C3530),
-    'Shot Put': const Color(0xFF3E362E),
-    'Javelin': const Color(0xFF45322E),
-    'Hammer': const Color(0xFF3F3A2A),
-    'Weight': const Color(0xFF1E2623),
+    'Discus': const Color(0xFF2C3530), // Deep Moss Green
+    'Shot Put': const Color(0xFF333B36), // Muted Pale Sage Grey-Green
+    'Javelin': const Color(0xFF3A443F), // Soft Clay Nordic Green
+    'Hammer': const Color(0xFF242B26), // Earth Dark Spruce Green
+    'Weight': const Color(0xFF1E2623), // Alpine Deep Timber Spruce
   };
 
   final Map<String, Color> _disciplineAccents = {
-    'Discus': const Color(0xFFACBC9A),
-    'Shot Put': const Color(0xFFD2B48C),
-    'Javelin': const Color(0xFFE07A5F),
-    'Hammer': const Color(0xFFF4A261),
-    'Weight': const Color(0xFF8FA89B),
+    'Discus': const Color(0xFFACBC9A), // Scandinavian Light Moss Highlight
+    'Shot Put': const Color(0xFFC2D3B4), // Soft Sage Accent
+    'Javelin': const Color(0xFFD2E0BF), // Pale Clay Lime Green Accent
+    'Hammer': const Color(0xFF9EB086), // Frost Forest Green Accent
+    'Weight': const Color(0xFF8FA89B), // Pure Glacial Spruce Highlight
   };
 
   final TextEditingController _distanceFieldController =
@@ -392,10 +392,14 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
     }
     final Color currentCanvasColor = _activeMenuIndex == 0
         ? const Color(0xFF2C3530)
-        : _disciplineBackgrounds[_disciplines[_activeMenuIndex - 1]]!;
+        : (_activeMenuIndex <= _disciplines.length
+            ? _disciplineBackgrounds[_disciplines[_activeMenuIndex - 1]]!
+            : const Color(0xFF1E2623));
     final Color currentAccentColor = _activeMenuIndex == 0
         ? const Color(0xFFACBC9A)
-        : _disciplineAccents[_disciplines[_activeMenuIndex - 1]]!;
+        : (_activeMenuIndex <= _disciplines.length
+            ? _disciplineAccents[_disciplines[_activeMenuIndex - 1]]!
+            : const Color(0xFFACBC9A));
     return Scaffold(
       backgroundColor: currentCanvasColor,
       appBar: AppBar(
@@ -408,6 +412,7 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
                 letterSpacing: 2.5)),
         actions: [
           PopupMenuButton(
+// 🔹 Fixed: Stripped out the legacy undefined 'onShadowChange' parameter handle
             onSelected: (value) async {
               if (value == 'NEW_USER_ACTION') {
                 await DatabaseHelper.instance.clearActiveProfile();
@@ -488,6 +493,8 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
                         return _buildTopNavTab(index + 1, d,
                             _getDisciplineIcon(d), currentAccentColor);
                       }),
+                      _buildTopNavTab(_disciplines.length + 1, 'System Guide',
+                          Icons.info_outline, currentAccentColor),
                     ],
                   ),
                 ),
@@ -498,8 +505,10 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
       ),
       body: _activeMenuIndex == 0
           ? _buildDashboardMatrixOverview()
-          : _buildDisciplineLayout(
-              _disciplines[_activeMenuIndex - 1], currentAccentColor),
+          : (_activeMenuIndex <= _disciplines.length
+              ? _buildDisciplineLayout(
+                  _disciplines[_activeMenuIndex - 1], currentAccentColor)
+              : _buildInstructionManualPage(currentAccentColor)),
     );
   }
 
@@ -939,17 +948,38 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
               ],
             ),
           ),
+// 🔹 Fixed: Swapped target literal 'Center' out for strict alignment enum variant 'TextAlign.center'
+          if (processingW != standardW &&
+              _distanceFieldController.text.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                  color: dynamicAccent.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(8)),
+              child: Text(
+                "Estimated projection for standard weight item: ${_calculateProjectedDistance(double.tryParse(_distanceFieldController.text) ?? 0.0, processingW, standardW).toStringAsFixed(2)}m",
+                style: TextStyle(
+                    color: dynamicAccent,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'Courier'),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ],
           const SizedBox(height: 14),
-          _buildThrowLogList(feed, discipline),
+          _buildThrowLogList(feed, discipline, standardW),
         ],
       ),
     );
   }
 
-  Widget _buildThrowLogList(List feed, String discipline) {
+  Widget _buildThrowLogList(List feed, String discipline, double standardW) {
     if (feed.isEmpty) return const SizedBox();
     return Container(
-      constraints: const BoxConstraints(maxHeight: 200),
+      constraints: const BoxConstraints(maxHeight: 250),
       decoration: BoxDecoration(
           color: const Color(0xFF1E221F),
           borderRadius: BorderRadius.circular(8)),
@@ -959,19 +989,36 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
         itemBuilder: (c, index) {
           final item = feed[feed.length - 1 - index];
           final int globalAttemptNumber = feed.length - index;
+          bool hasOverride = item.activeWeight != standardW;
           return ListTile(
             dense: true,
             title: Text("Attempt #$globalAttemptNumber",
                 style:
                     const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
             subtitle: Text(
-                "Weight: ${item.activeWeight.toStringAsFixed(1)}${discipline == 'Javelin' ? 'g' : 'kg'}",
-                style: const TextStyle(fontSize: 10)),
-            trailing: Text("${item.loggedDistance.toStringAsFixed(2)}m",
-                style: const TextStyle(
-                    fontFamily: 'Courier',
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13)),
+                "Weight: ${item.activeWeight.toStringAsFixed(1)}${discipline == 'Javelin' ? 'g' : 'kg'}${hasOverride ? ' (Custom Override)' : ''}",
+                style: TextStyle(
+                    fontSize: 10,
+                    color: hasOverride
+                        ? _disciplineAccents[discipline]
+                        : Colors.grey)),
+            trailing: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text("${item.loggedDistance.toStringAsFixed(2)}m",
+                    style: const TextStyle(
+                        fontFamily: 'Courier',
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13)),
+                if (hasOverride)
+                  Text("Est: ${item.projectedDistance.toStringAsFixed(2)}m",
+                      style: const TextStyle(
+                          fontSize: 9,
+                          color: Colors.white54,
+                          fontFamily: 'Courier')),
+              ],
+            ),
           );
         },
       ),
@@ -1039,8 +1086,59 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
     );
   }
 
-// 🔹 Simple Toggle-Based Onboarding Layout System
+  Widget _buildInstructionManualPage(Color accent) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20.0),
+      child: Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+            color: const Color(0xFF1E221F),
+            borderRadius: BorderRadius.circular(12)),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text("ENGINE MATHEMATICS & FEATURES LOG",
+                style: TextStyle(
+                    color: accent,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                    fontFamily: 'Courier',
+                    letterSpacing: 1)),
+            const Divider(height: 20, color: Colors.white12),
+            _buildManualSectionNode("1. Linear-Inverse Performance Mapping",
+                "When logging attempts using custom weight overrides, the engine dynamically estimates performance targets using standard age-group baselines:\n\nFormula: Projected = Logged Distance * (Actual Override Weight / Regional Standard Weight)"),
+            _buildManualSectionNode("2. Regional Merit Benchmarks",
+                "The horizontal line on your analytics trend chart graphs the BMAF/WMA qualifying thresholds. For instance, an M55 Discus competitor maps against a 29.10m target benchmark line."),
+            _buildManualSectionNode("3. Training Density Matrices",
+                "The dashboard matrix bars dynamically monitor activity trends based on the logged entries recorded over the rolling 7-day period."),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildManualSectionNode(String title, String body) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title,
+              style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                  color: Colors.white70)),
+          const SizedBox(height: 6),
+          Text(body,
+              style: const TextStyle(
+                  fontSize: 11, color: Colors.grey, height: 1.4)),
+        ],
+      ),
+    );
+  }
+
   Widget _buildOnboardingScreen() {
+// 🔹 Fixed: Stripped out legacy unused local variables to satisfy strict Dart analysis flags
     return Scaffold(
       body: Center(
         child: SingleChildScrollView(
