@@ -71,7 +71,7 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
 
   int _activeMenuIndex = 0;
   String _selectedDivision = "M55";
-  final String _onboardingSelectedSex = "M";
+  String _onboardingSelectedSex = "M";
 
   int _onboardingCountryIdx = 0;
   int _onboardingAgeIdx = 3;
@@ -129,21 +129,20 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
     'Weight': null
   };
 
-  // 🎨 Distinct Graded Shades of Premium Scandinavian Moss, Sage, Forest, and Spruce
   final Map<String, Color> _disciplineBackgrounds = {
-    'Discus': const Color(0xFF2C3530), // Moss Spruce Shading
-    'Shot Put': const Color(0xFF333B36), // Deep Muted Sage
-    'Javelin': const Color(0xFF3A443F), // Soft Slate Forest
-    'Hammer': const Color(0xFF242B26), // Dense Alpine Timber
-    'Weight': const Color(0xFF1E2623), // Glacial Spruce Green
+    'Discus': const Color(0xFF2C3530),
+    'Shot Put': const Color(0xFF333B36),
+    'Javelin': const Color(0xFF3A443F),
+    'Hammer': const Color(0xFF242B26),
+    'Weight': const Color(0xFF1E2623),
   };
 
   final Map<String, Color> _disciplineAccents = {
-    'Discus': const Color(0xFFACBC9A), // Nordic Moss Highlights
-    'Shot Put': const Color(0xFFC2D3B4), // Premium Pale Sage
-    'Javelin': const Color(0xFFD2E0BF), // Frost Birch Green
-    'Hammer': const Color(0xFF9EB086), // Woodland Leaf Accent
-    'Weight': const Color(0xFF8FA89B), // Ice Spruce Highlight
+    'Discus': const Color(0xFFACBC9A),
+    'Shot Put': const Color(0xFFC2D3B4),
+    'Javelin': const Color(0xFFD2E0BF),
+    'Hammer': const Color(0xFF9EB086),
+    'Weight': const Color(0xFF8FA89B),
   };
 
   final TextEditingController _distanceFieldController =
@@ -176,9 +175,6 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
   @override
   void initState() {
     super.initState();
-    _distanceFieldController.addListener(() {
-      setState(() {});
-    });
     _initializeAppDatabaseAndProfiles();
   }
 
@@ -189,7 +185,6 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
     super.dispose();
   }
 
-  // 📐 Core Mathematical Operations
   double _calculateProjectedDistance(
       double distance, double actualW, double standardW) {
     if (actualW == standardW || actualW <= 0) return distance;
@@ -197,7 +192,8 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
   }
 
   double _getStandardWeight(String discipline, String division) {
-    bool isMale = division.startsWith('M');
+    final bool isMale = division.startsWith('M');
+
     if (division.contains('55') || division.contains('50')) {
       if (discipline == 'Discus') return isMale ? 1.5 : 1.0;
       if (discipline == 'Shot Put') return isMale ? 6.0 : 3.0;
@@ -205,6 +201,7 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
       if (discipline == 'Hammer') return isMale ? 6.0 : 3.0;
       return isMale ? 11.34 : 7.26;
     }
+
     if (discipline == 'Discus') return isMale ? 2.0 : 1.0;
     if (discipline == 'Shot Put') return isMale ? 7.26 : 4.0;
     if (discipline == 'Javelin') return isMale ? 800.0 : 600.0;
@@ -892,6 +889,35 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
             ),
           ),
           const SizedBox(height: 12),
+// ValueListenableBuilder intercepts updates implicitly, resolving keystroke loop inefficiencies
+          ValueListenableBuilder(
+            valueListenable: _distanceFieldController,
+            builder: (context, val, child) {
+              final double? parseValue = double.tryParse(val.text);
+              if (processingW != standardW &&
+                  parseValue != null &&
+                  parseValue > 0) {
+                return Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                      color: dynamicAccent.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(8)),
+                  child: Text(
+                    "Estimated projection for standard weight item: ${_calculateProjectedDistance(parseValue, processingW, standardW).toStringAsFixed(2)}m",
+                    style: TextStyle(
+                        color: dynamicAccent,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'Courier'),
+                    textAlign: TextAlign.center,
+                  ),
+                );
+              }
+              return const SizedBox.shrink();
+            },
+          ),
           Container(
             decoration: BoxDecoration(
                 color: const Color(0xFF1E221F),
@@ -991,26 +1017,6 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
               ],
             ),
           ),
-          if (processingW != standardW &&
-              _distanceFieldController.text.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                  color: dynamicAccent.withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(8)),
-              child: Text(
-                "Estimated projection for standard weight item: ${_calculateProjectedDistance(double.tryParse(_distanceFieldController.text) ?? 0.0, processingW, standardW).toStringAsFixed(2)}m",
-                style: TextStyle(
-                    color: dynamicAccent,
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                    fontFamily: 'Courier'),
-                textAlign: TextAlign.center,
-              ),
-            ),
-          ],
           const SizedBox(height: 14),
           _buildThrowLogList(feed, discipline, standardW),
         ],
@@ -1081,7 +1087,6 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
     ];
     double windowMax = 0.0;
     double windowAvg = 0.0;
-// 🔹 Fixed: Replaced the un-inferred .reduce() array operator with a simple, standard loop to pull high metrics cleanly
     if (filteredFeed.isNotEmpty) {
       windowMax = filteredFeed.first.loggedDistance;
       double totalSum = 0.0;
@@ -1307,6 +1312,37 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
                       labelText: "Username / Name"),
                 ),
                 const SizedBox(height: 20),
+                const Text("GENDER DESIGNATION BAND",
+                    style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey,
+                        letterSpacing: 1)),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    ChoiceChip(
+                      label: const Text("Male (M)",
+                          style: TextStyle(
+                              fontSize: 11, fontWeight: FontWeight.bold)),
+                      selected: _onboardingSelectedSex == "M",
+                      selectedColor: const Color(0xFFACBC9A),
+                      onSelected: (bool selected) =>
+                          setState(() => _onboardingSelectedSex = "M"),
+                    ),
+                    const SizedBox(width: 10),
+                    ChoiceChip(
+                      label: const Text("Female (F)",
+                          style: TextStyle(
+                              fontSize: 11, fontWeight: FontWeight.bold)),
+                      selected: _onboardingSelectedSex == "F",
+                      selectedColor: const Color(0xFFACBC9A),
+                      onSelected: (bool selected) =>
+                          setState(() => _onboardingSelectedSex = "F"),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
                 const Text("ATHLETIC NATION ORIGIN",
                     style: TextStyle(
                         fontSize: 10,
@@ -1325,11 +1361,10 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 10, vertical: 6),
                         decoration: BoxDecoration(
-                          color: isSel
-                              ? const Color(0xFFACBC9A)
-                              : const Color(0xFF2C3530),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
+                            color: isSel
+                                ? const Color(0xFFACBC9A)
+                                : const Color(0xFF2C3530),
+                            borderRadius: BorderRadius.circular(6)),
                         child: Text(_countriesList[idx],
                             style: TextStyle(
                                 color: isSel ? Colors.black : Colors.white70,
@@ -1358,11 +1393,10 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 10, vertical: 6),
                         decoration: BoxDecoration(
-                          color: isSel
-                              ? const Color(0xFFACBC9A)
-                              : const Color(0xFF2C3530),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
+                            color: isSel
+                                ? const Color(0xFFACBC9A)
+                                : const Color(0xFF2C3530),
+                            borderRadius: BorderRadius.circular(6)),
                         child: Text(_ageGroupsList[idx],
                             style: TextStyle(
                                 color: isSel ? Colors.black : Colors.white70,
