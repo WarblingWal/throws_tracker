@@ -1,0 +1,44 @@
+name: Flutter Build APK
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository Code
+        uses: actions/checkout@v4
+
+      - name: Setup Java Environment
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Setup Flutter Framework Engine
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.x'
+          channel: 'stable'
+          cache: true
+
+      - name: Synchronize Package Dependencies
+        run: flutter pub get
+
+      - name: Compile Production Release APK with Toolchain Environment Overrides
+        run: flutter build apk --release --no-tree-shake-icons --android-skip-build-dependency-validation
+        env:
+          GRADLE_OPTS: "-Dandroid.newDsl=false -Dandroid.suppressUnsupportedCompileSdk=true"
+
+      # 🔹 Added: This step captures your compiled APK file and attaches it to the GitHub dashboard
+      - name: Publish Compiled APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ThrowsHubPro-Release-APK
+          path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
