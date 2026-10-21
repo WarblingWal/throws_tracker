@@ -332,7 +332,7 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
     if (country.contains('United Kingdom') || country.contains('UK')) {
       if (isM55 && isMale) {
         if (discipline == 'Discus')
-          return 29.10; // Official British BMAF M55 Merit Standard [1.21]
+          return 29.10; // Official British BMAF M55 Merit Standard
         if (discipline == 'Shot Put') return 9.20;
         if (discipline == 'Javelin') return 29.50;
         if (discipline == 'Hammer') return 30.20;
@@ -766,7 +766,8 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
                   ),
                 ),
                 const SizedBox(width: 12),
-                ElevatedButton(
+                IconButton(
+                  icon: Icon(Icons.send, color: dynamicAccent),
                   onPressed: () async {
                     double loggedDist =
                         double.tryParse(_distanceFieldController.text) ?? 0.0;
@@ -785,12 +786,6 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
                       await _loadSavedUserThrows();
                     }
                   },
-                  style: ElevatedButton.styleFrom(
-                      backgroundColor: dynamicAccent,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 20, vertical: 14)),
-                  child: const Icon(Icons.send,
-                      color: Color(0xFF131516), size: 18),
                 ),
               ],
             ),
@@ -918,7 +913,6 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
                     onPressed: () async {
                       if (_onboardingNameController.text.trim().isNotEmpty) {
                         final db = DatabaseHelper.instance;
-// Forward country dropdown selection straight down into database schema column v2
                         int id = await db.createProfile(
                             _onboardingNameController.text.trim(),
                             _onboardingSelectedSex,
