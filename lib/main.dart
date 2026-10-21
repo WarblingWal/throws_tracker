@@ -13,7 +13,6 @@ class ThrowsTrackerApp extends StatelessWidget {
       title: 'Throws Hub Pro',
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark().copyWith(
-        // Upgraded to a premium Scandinavian Sage-Earth tone base palette
         scaffoldBackgroundColor: const Color(0xFF2C3530),
         primaryColor: const Color(0xFFACBC9A),
         cardColor: const Color(0xFF1E221F),
@@ -28,11 +27,13 @@ class ThrowsTrackerApp extends StatelessWidget {
 }
 
 class ThrowEntry {
+  final int? id;
   final double loggedDistance;
   final double activeWeight;
   final double projectedDistance;
 
   const ThrowEntry({
+    this.id,
     required this.loggedDistance,
     required this.activeWeight,
     required this.projectedDistance,
@@ -81,7 +82,6 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
 
   int _activeMenuIndex = 0;
   String _selectedDivision = "M55";
-
   String _onboardingSelectedSex = "M";
   String _onboardingSelectedAge = "55";
 
@@ -146,6 +146,7 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
         monthlyAvg: 18.90,
         yearlyAvg: 18.10),
   };
+
   late stt.SpeechToText _speechEngine;
   bool _isVoiceListening = false;
   String _voiceWordsTranscribed =
@@ -162,6 +163,7 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
   void dispose() {
     _distanceFieldController.dispose();
     _onboardingNameController.dispose();
+    _speechEngine.stop();
     super.dispose();
   }
 
@@ -212,10 +214,9 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
     for (String discipline in _disciplines) {
       final throwMaps =
           await db.fetchThrowsForUser(_currentActiveUser!.id, discipline);
-
-      // Explicit (m['field'] as num).toDouble() prevents runtime casting exceptions on integers
       List<ThrowEntry> entries = throwMaps
           .map((m) => ThrowEntry(
+                id: m['id'] as int?,
                 loggedDistance: (m['loggedDistance'] as num).toDouble(),
                 activeWeight: (m['activeWeight'] as num).toDouble(),
                 projectedDistance: (m['projectedDistance'] as num).toDouble(),
@@ -236,18 +237,6 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
       if (discipline == 'Javelin') return isMale ? 700.0 : 500.0;
       if (discipline == 'Hammer') return isMale ? 6.0 : 3.0;
       return isMale ? 11.34 : 7.26;
-    } else if (division.contains('60') ||
-        division.contains('65') ||
-        division.contains('70') ||
-        division.contains('75') ||
-        division.contains('80') ||
-        division.contains('85') ||
-        division.contains('90')) {
-      if (discipline == 'Discus') return isMale ? 1.0 : 0.75;
-      if (discipline == 'Shot Put') return isMale ? 5.0 : 2.0;
-      if (discipline == 'Javelin') return isMale ? 600.0 : 400.0;
-      if (discipline == 'Hammer') return isMale ? 5.0 : 2.0;
-      return isMale ? 9.08 : 5.45;
     }
     if (discipline == 'Discus') return isMale ? 2.0 : 1.0;
     if (discipline == 'Shot Put') return isMale ? 7.26 : 4.0;
@@ -258,9 +247,7 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
 
   double _calculateProjectedDistance(
       double distance, double actualW, double standardW) {
-    if (actualW == standardW || actualW <= 0) {
-      return distance;
-    }
+    if (actualW == standardW || actualW <= 0) return distance;
     return distance * (actualW / standardW);
   }
 
@@ -271,12 +258,12 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
     if (discipline == 'Hammer') return Icons.gavel;
     return Icons.ads_click;
   }
+}
 
+extension MainNavigationHubVoiceAndUI on _MainNavigationHubState {
   void _parseVoiceCommand(String rawSentence) async {
     String phrase = rawSentence.toLowerCase();
-    if (!phrase.contains('enter') && !phrase.contains('throw')) {
-      return;
-    }
+    if (!phrase.contains('enter') && !phrase.contains('throw')) return;
 
     UserProfile? matchedUser;
     for (var profile in _allProfiles) {
@@ -289,17 +276,16 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
     if (matchedUser == null) return;
 
     String? matchedDiscipline;
-    if (phrase.contains('discus')) {
+    if (phrase.contains('discus'))
       matchedDiscipline = 'Discus';
-    } else if (phrase.contains('shot') || phrase.contains('put')) {
+    else if (phrase.contains('shot') || phrase.contains('put'))
       matchedDiscipline = 'Shot Put';
-    } else if (phrase.contains('javelin')) {
+    else if (phrase.contains('javelin'))
       matchedDiscipline = 'Javelin';
-    } else if (phrase.contains('hammer')) {
+    else if (phrase.contains('hammer'))
       matchedDiscipline = 'Hammer';
-    } else if (phrase.contains('weight')) {
-      matchedDiscipline = 'Weight';
-    }
+    else if (phrase.contains('weight')) matchedDiscipline = 'Weight';
+
     matchedDiscipline ??=
         _activeMenuIndex > 0 ? _disciplines[_activeMenuIndex - 1] : 'Discus';
 
@@ -309,13 +295,11 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
     RegExp cmRegex = RegExp(r'(\d+)\s*centimeter');
 
     var meterMatch = meterRegex.firstMatch(phrase);
-    if (meterMatch != null) {
+    if (meterMatch != null)
       meters = double.tryParse(meterMatch.group(1) ?? '0') ?? 0.0;
-    }
     var cmMatch = cmRegex.firstMatch(phrase);
-    if (cmMatch != null) {
+    if (cmMatch != null)
       centimeters = double.tryParse(cmMatch.group(1) ?? '0') ?? 0.0;
-    }
 
     double finalDistance = meters + (centimeters / 100.0);
     if (finalDistance <= 0.0) return;
@@ -353,21 +337,18 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
   void _toggleVoiceListening() async {
     if (!_isVoiceListening) {
       bool available = await _speechEngine.initialize(
-        onStatus: (status) => debugPrint('Speech Status: $status'),
+        onStatus: (status) {
+          debugPrint('Speech Status Update: $status');
+          if (status == 'notListening' && _isVoiceListening) {
+            _restartListeningLoop();
+          }
+        },
         onError: (errorNotification) =>
             debugPrint('Speech Error: $errorNotification'),
       );
       if (available) {
         setState(() => _isVoiceListening = true);
-        _speechEngine.listen(onResult: (result) {
-          setState(() {
-            _voiceWordsTranscribed = result.recognizedWords;
-            if (result.finalResult) {
-              _parseVoiceCommand(result.recognizedWords);
-              _isVoiceListening = false;
-            }
-          });
-        });
+        _startListeningExecution();
       }
     } else {
       setState(() => _isVoiceListening = false);
@@ -375,149 +356,30 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    if (_isLoading) {
-      return const Scaffold(
-          body: Center(
-              child: CircularProgressIndicator(color: Color(0xFFACBC9A))));
-    }
-
-    if (_currentActiveUser == null) {
-      return _buildOnboardingScreen();
-    }
-
-    return Scaffold(
-      appBar: AppBar(
-        // Clean, technical monospace title header
-        title: const Text(
-          'THROWS HUB PRO',
-          style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              fontFamily: 'Courier',
-              letterSpacing: 2),
-        ),
-        // 🔹 Relocated Navigation: Menu items sit directly under the main title header
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(48),
-          child: Container(
-            color: const Color(0xFF2C3530),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  _buildTopNavTab(0, 'Overview', Icons.dashboard),
-                  ...List.generate(_disciplines.length, (index) {
-                    final d = _disciplines[index];
-                    return _buildTopNavTab(index + 1, d, _getDisciplineIcon(d));
-                  }),
-                ],
-              ),
-            ),
-          ),
-        ),
-        // 🔹 Dropdown Gateway: Active athlete account switcher pinned to the top right corner
-        actions: [
-          PopupMenuButton<String>(
-            onSelected: (value) async {
-              if (value == 'NEW_USER_ACTION') {
-                await DatabaseHelper.instance.clearActiveProfile();
-                _initializeAppDatabaseAndProfiles();
-              } else {
-                int profileId = int.parse(value);
-                await DatabaseHelper.instance.setActiveProfile(profileId);
-                _initializeAppDatabaseAndProfiles();
-              }
-            },
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: Row(
-                children: [
-                  Text(
-                    "${_currentActiveUser!.username} ($_selectedDivision)",
-                    style: const TextStyle(
-                        color: Color(0xFFACBC9A),
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12),
-                  ),
-                  const Icon(Icons.arrow_drop_down, color: Color(0xFFACBC9A)),
-                ],
-              ),
-            ),
-            itemBuilder: (BuildContext context) {
-              return [
-                ..._allProfiles.map((profile) {
-                  return PopupMenuItem<String>(
-                    value: profile.id.toString(),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.person,
-                          size: 18,
-                          color: profile.id == _currentActiveUser!.id
-                              ? const Color(0xFFACBC9A)
-                              : Colors.grey,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          profile.username,
-                          style: TextStyle(
-                            fontWeight: profile.id == _currentActiveUser!.id
-                                ? FontWeight.bold
-                                : FontWeight.normal,
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }),
-                const PopupMenuDivider(),
-                const PopupMenuItem<String>(
-                  value: 'NEW_USER_ACTION',
-                  child: Row(
-                    children: [
-                      Icon(Icons.add, size: 18, color: Color(0xFFACBC9A)),
-                      SizedBox(width: 8),
-                      Text("New User...",
-                          style: TextStyle(color: Color(0xFFACBC9A))),
-                    ],
-                  ),
-                ),
-              ];
-            },
-          ),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor:
-            _isVoiceListening ? Colors.redAccent : const Color(0xFFACBC9A),
-        onPressed: _toggleVoiceListening,
-        child: Icon(_isVoiceListening ? Icons.mic : Icons.mic_none,
-            color: const Color(0xFF131516)),
-      ),
-      body: Column(
-        children: [
-          if (_isVoiceListening)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              color: const Color(0xFF1E221F),
-              child: Text(_voiceWordsTranscribed,
-                  style: const TextStyle(
-                      fontStyle: FontStyle.italic,
-                      color: Color(0xFFACBC9A),
-                      fontSize: 13),
-                  textAlign: TextAlign.center),
-            ),
-          Expanded(
-            child: _activeMenuIndex == 0
-                ? _buildDashboardMatrixOverview()
-                : _buildDisciplineLayout(_disciplines[_activeMenuIndex - 1]),
-          ),
-        ],
-      ),
+  void _startListeningExecution() {
+    _speechEngine.listen(
+      onResult: (result) {
+        setState(() {
+          _voiceWordsTranscribed = result.recognizedWords;
+          if (result.finalResult) {
+            _parseVoiceCommand(result.recognizedWords);
+          }
+        });
+      },
+      listenFor: const Duration(seconds: 30),
+      pauseFor: const Duration(seconds: 4),
+      partialResults: true,
     );
+  }
+
+  void _restartListeningLoop() {
+    if (_isVoiceListening) {
+      Future.delayed(const Duration(milliseconds: 250), () {
+        if (_isVoiceListening && !_speechEngine.isListening) {
+          _startListeningExecution();
+        }
+      });
+    }
   }
 
   Widget _buildTopNavTab(int index, String label, IconData icon) {
@@ -526,10 +388,12 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
       onTap: () => setState(() => _activeMenuIndex = index),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        border: Border(
-          bottom: BorderSide(
-            color: isSelected ? const Color(0xFFACBC9A) : Colors.transparent,
-            width: 2,
+        decoration: BoxDecoration(
+          border: Border(
+            bottom: BorderSide(
+              color: isSelected ? const Color(0xFFACBC9A) : Colors.transparent,
+              width: 2,
+            ),
           ),
         ),
         child: Row(
@@ -538,14 +402,12 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
                 size: 16,
                 color: isSelected ? const Color(0xFFACBC9A) : Colors.grey),
             const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                color: isSelected ? const Color(0xFFACBC9A) : Colors.grey,
-              ),
-            ),
+            Text(label,
+                style: TextStyle(
+                    fontSize: 12,
+                    fontWeight:
+                        isSelected ? FontWeight.bold : FontWeight.normal,
+                    color: isSelected ? const Color(0xFFACBC9A) : Colors.grey)),
           ],
         ),
       ),
@@ -556,11 +418,10 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
     return GridView.builder(
       padding: const EdgeInsets.all(16),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
-        childAspectRatio: 1.1,
-      ),
+          crossAxisCount: 2,
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 12,
+          childAspectRatio: 1.1),
       itemCount: _disciplines.length,
       itemBuilder: (context, idx) {
         final d = _disciplines[idx];
@@ -576,18 +437,8 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(d.toUpperCase(),
-                        style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13,
-                            letterSpacing: 1)),
-                    Icon(_getDisciplineIcon(d),
-                        color: const Color(0xFFACBC9A), size: 18),
-                  ],
-                ),
+                NavigatorRow(
+                    title: d.toUpperCase(), icon: _getDisciplineIcon(d)),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -612,7 +463,28 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
       },
     );
   }
+}
 
+class NavigatorRow extends StatelessWidget {
+  final String title;
+  final IconData icon;
+  const NavigatorRow({super.key, required this.title, required this.icon});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(title,
+            style: const TextStyle(
+                fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 1)),
+        Icon(icon, color: const Color(0xFFACBC9A), size: 18),
+      ],
+    );
+  }
+}
+
+extension MainNavigationHubViewComposers on _MainNavigationHubState {
   Widget _buildDisciplineLayout(String discipline) {
     return DefaultTabController(
       length: 2,
@@ -722,7 +594,7 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
                             _customWeightOverrides[discipline] ?? standardW;
                         _customWeightOverrides[discipline] =
                             (current - (discipline == 'Javelin' ? 50 : 0.25))
-                                .clamp(0.1, 1000.0);
+                                .clamp(0.1, 5000.0);
                       }),
                     ),
                     Text(
@@ -815,7 +687,7 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
   Widget _buildThrowLogList(List<ThrowEntry> feed, String discipline) {
     if (feed.isEmpty) return const SizedBox();
     return Container(
-      constraints: const BoxConstraints(maxHeight: 200),
+      constraints: const BoxConstraints(maxHeight: 250),
       decoration: BoxDecoration(
           color: const Color(0xFF1E221F),
           borderRadius: BorderRadius.circular(8)),
@@ -823,10 +695,11 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
         shrinkWrap: true,
         itemCount: feed.length,
         itemBuilder: (c, index) {
-          final item = feed[feed.length - 1 - index];
+          final item = feed[index];
+          final int globalAttemptNumber = index + 1;
           bool hasVariance = item.loggedDistance != item.projectedDistance;
           return ListTile(
-            title: Text("Attempt #${feed.length - index}",
+            title: Text("Attempt #$globalAttemptNumber",
                 style:
                     const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
             subtitle: Text(
@@ -860,14 +733,12 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
       {"title": "Monthly Rolling Average", "val": data.monthlyAvg},
       {"title": "Yearly Rolling Average", "val": data.yearlyAvg},
     ];
-
     return ListView.builder(
       padding: const EdgeInsets.all(20),
       itemCount: recordsList.length,
       itemBuilder: (context, index) {
         bool isExpanded = _expandedAccordionIndex[discipline] == index;
         final row = recordsList[index];
-
         return Container(
           margin: const EdgeInsets.only(bottom: 12),
           decoration: BoxDecoration(
@@ -884,9 +755,9 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
                         fontFamily: 'Courier',
                         fontWeight: FontWeight.bold,
                         color: Color(0xFFACBC9A))),
-                onTap: () => setState(() {
-                  _expandedAccordionIndex[discipline] = isExpanded ? -1 : index;
-                }),
+                onTap: () => setState(() =>
+                    _expandedAccordionIndex[discipline] =
+                        isExpanded ? -1 : index),
               ),
               if (isExpanded) _buildAccordionGraphContent(),
             ],
@@ -920,10 +791,9 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
                     height: 70 * heightFactor,
                     width: 24,
                     decoration: BoxDecoration(
-                      color: const Color(0xFFACBC9A)
-                          .withOpacity(0.4 + (barIndex * 0.12)),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
+                        color: const Color(0xFFACBC9A)
+                            .withOpacity(0.4 + (barIndex * 0.12)),
+                        borderRadius: BorderRadius.circular(4)),
                   ),
                   const SizedBox(height: 6),
                   Text("T-${5 - barIndex}",
@@ -1023,7 +893,6 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
                         fontWeight: FontWeight.bold,
                         color: Colors.grey)),
                 const SizedBox(height: 6),
-// 🔹 Explicit (value as String) casting applied directly inside the DropdownButton item map layout to prevent compilation kernel failures
                 DropdownButton(
                   value: _onboardingSelectedAge,
                   isExpanded: true,
@@ -1075,6 +944,7 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
     );
   }
 
+  Widget _buildOnboardingScreen() => throw UnimplementedError();
   Widget _buildPanelStatNode(String label, String value, Color textAccent) {
     return Column(
       children: [
