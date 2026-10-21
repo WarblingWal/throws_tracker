@@ -1045,16 +1045,19 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
               bool isSelected = _activeModeFilter == m;
               return Padding(
                 padding: const EdgeInsets.only(right: 6.0, bottom: 6.0),
-                child: ChoiceChip(
-                  label: Text(m,
-                      style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: isSelected ? Colors.black : Colors.white)),
-                  selected: isSelected,
-                  selectedColor: dynamicAccent,
-                  backgroundColor: const Color(0xFF1E221F),
-                  onSelected: (s) => setState(() => _activeModeFilter = m),
+                child: Theme(
+                  data: ThemeData.dark()
+                      .copyWith(canvasColor: Colors.transparent),
+                  child: ChoiceChip(
+                    label: Text(m,
+                        style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: isSelected ? Colors.black : Colors.white)),
+                    selected: isSelected,
+                    selectedColor: dynamicAccent,
+                    onSelected: (s) => setState(() => _activeModeFilter = m),
+                  ),
                 ),
               );
             }).toList(),
@@ -1234,22 +1237,25 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
                       bool isSelected = _activeEntryTechnique == tech;
                       return Padding(
                         padding: const EdgeInsets.only(right: 6.0),
-                        child: ChoiceChip(
-                          label: Text(tech,
-                              style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                  color: isSelected
-                                      ? Colors.black
-                                      : Colors.white70)),
-                          selected: isSelected,
-                          selectedColor: dynamicAccent,
-                          backgroundColor: const Color(0xFF2C302E),
-                          onSelected: (bool selected) {
-                            if (selected) {
-                              setState(() => _activeEntryTechnique = tech);
-                            }
-                          },
+                        child: Theme(
+                          data: ThemeData.dark()
+                              .copyWith(canvasColor: Colors.transparent),
+                          child: ChoiceChip(
+                            label: Text(tech,
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: isSelected
+                                        ? Colors.black
+                                        : Colors.white70)),
+                            selected: isSelected,
+                            selectedColor: dynamicAccent,
+                            onSelected: (bool selected) {
+                              if (selected) {
+                                setState(() => _activeEntryTechnique = tech);
+                              }
+                            },
+                          ),
                         ),
                       );
                     }).toList(),
@@ -1341,40 +1347,189 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
           bool exceedsMerit = item.loggedDistance >= meritStandard;
           Color leadingIconColor =
               exceedsMerit ? const Color(0xFF4CAF50) : Colors.white30;
-          return ListTile(
-            dense: true,
-            leading: Icon(
-                item.performanceMode == 'Competition'
-                    ? Icons.emoji_events
-                    : Icons.fitness_center,
-                size: 16,
-                color: leadingIconColor),
-            title: Text(
-                "Attempt #$globalAttemptNumber [${item.performanceMode}] - ${item.technique}",
-                style:
-                    const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-            subtitle: Text(
-                "Weight: ${item.activeWeight.toStringAsFixed(1)}${discipline == 'Javelin' ? 'g' : 'kg'}${hasOverride ? ' (Override)' : ''}",
-                style: const TextStyle(fontSize: 12, color: Color(0xFF909499))),
-            trailing: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text("${item.loggedDistance.toStringAsFixed(2)}m",
-                    style: const TextStyle(
-                        fontFamily: 'Courier',
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14)),
-                if (hasOverride)
-                  Text("Est: ${item.projectedDistance.toStringAsFixed(2)}m",
+          return Dismissible(
+            key: Key(item.id?.toString() ?? 'throw_${index}_${item.timestamp}'),
+            direction: DismissDirection.endToStart,
+            background: Container(
+              alignment: Alignment.centerRight,
+              padding: const EdgeInsets.symmetric(horizontal: 20.0),
+              color: const Color(0xFFFF5252),
+              child: const Icon(Icons.delete_forever, color: Colors.white),
+            ),
+            onDismissed: (direction) async {
+              if (item.id != null) {
+                final db = DatabaseHelper.instance;
+                bool codeDeleted = await db.deleteThrow(item.id!);
+                if (codeDeleted) {
+                  await _loadSavedUserThrows();
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                            "Throw entry removed successfully from database storage."),
+                        backgroundColor: Color(0xFF1E221F),
+                      ),
+                    );
+                  }
+                }
+              }
+            },
+            child: ListTile(
+              dense: true,
+              leading: Icon(
+                  item.performanceMode == 'Competition'
+                      ? Icons.emoji_events
+                      : Icons.fitness_center,
+                  size: 16,
+                  color: leadingIconColor),
+              title: Text(
+                  "Attempt #$globalAttemptNumber [${item.performanceMode}] - ${item.technique}",
+                  style: const TextStyle(
+                      fontSize: 12, fontWeight: FontWeight.bold)),
+              subtitle: Text(
+                  "Weight: ${item.activeWeight.toStringAsFixed(1)}${discipline == 'Javelin' ? 'g' : 'kg'}${hasOverride ? ' (Override)' : ''}",
+                  style:
+                      const TextStyle(fontSize: 12, color: Color(0xFF909499))),
+              trailing: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text("${item.loggedDistance.toStringAsFixed(2)}m",
                       style: const TextStyle(
-                          fontSize: 11,
-                          color: Color(0xFF909499),
-                          fontFamily: 'Courier')),
-              ],
+                          fontFamily: 'Courier',
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14)),
+                  if (hasOverride)
+                    Text("Est: ${item.projectedDistance.toStringAsFixed(2)}m",
+                        style: const TextStyle(
+                            fontSize: 11,
+                            color: Color(0xFF909499),
+                            fontFamily: 'Courier')),
+                ],
+              ),
             ),
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildTechniqueEfficiencyMatrixTable(String discipline, Color accent) {
+    final List throws = _sessionLogs[discipline] ?? [];
+    if (throws.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 12.0),
+        child: Text("No records caught to process comparative metrics tables.",
+            style: TextStyle(fontSize: 11, color: Colors.grey)),
+      );
+    }
+    double standingAvg = 0.0;
+    int standingCount = 0;
+    final Map<String, List> nonStandingLogs = {};
+    for (var t in throws) {
+      if (t.technique == 'Standing Throw') {
+        standingAvg += t.loggedDistance;
+        standingCount++;
+      } else {
+        nonStandingLogs
+            .putIfAbsent(t.technique, () => [])
+            .add(t.loggedDistance);
+      }
+    }
+    if (standingCount > 0) {
+      standingAvg /= standingCount;
+    }
+    if (nonStandingLogs.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 12.0),
+        child: Text(
+            "Log advanced execution variants to view delta analytics curves.",
+            style: TextStyle(fontSize: 11, color: Colors.grey)),
+      );
+    }
+    return Container(
+      margin: const EdgeInsets.only(top: 8, bottom: 20),
+      decoration: BoxDecoration(
+          color: const Color(0xFF1E221F),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.white10)),
+      child: Table(
+        columnWidths: const {
+          0: FlexColumnWidth(2.2),
+          1: FlexColumnWidth(1.2),
+          2: FlexColumnWidth(1.2),
+          3: FlexColumnWidth(1.2),
+        },
+        border: const TableBorder(
+            horizontalInside: BorderSide(color: Colors.white12, width: 1)),
+        children: [
+// 🛡️ Fix applied: Swapped raw parameter for explicit BoxDecoration token wrapper
+          TableRow(
+            decoration: const BoxDecoration(color: Colors.black26),
+            children: [
+              _buildTableCellLabel("TECHNIQUE VARIANT",
+                  isHeader: true, textColor: accent),
+              _buildTableCellLabel("COUNT",
+                  isHeader: true, textColor: Colors.grey),
+              _buildTableCellLabel("AVG DIST",
+                  isHeader: true, textColor: Colors.grey),
+              _buildTableCellLabel("EFF DELTA",
+                  isHeader: true, textColor: accent),
+            ],
+          ),
+          ...nonStandingLogs.entries.map((entry) {
+            final String techName = entry.key;
+            final List distances = entry.value;
+            final double techAvg =
+                distances.reduce((a, b) => a + b) / distances.length;
+            double deltaValue = 0.0;
+            double percentageGain = 0.0;
+            if (standingAvg > 0) {
+              deltaValue = techAvg - standingAvg;
+              percentageGain = (deltaValue / standingAvg) * 100;
+            }
+            String deltaStr = "0.00m";
+            Color deltaColor = Colors.grey;
+            if (deltaValue > 0) {
+              deltaStr =
+                  "+${deltaValue.toStringAsFixed(2)}m (+${percentageGain.toStringAsFixed(1)}%)";
+              deltaColor = const Color(0xFF4CAF50);
+            } else if (deltaValue < 0) {
+              deltaStr =
+                  "${deltaValue.toStringAsFixed(2)}m (${percentageGain.toStringAsFixed(1)}%)";
+              deltaColor = const Color(0xFFFF5252);
+            }
+            return TableRow(
+              children: [
+                _buildTableCellLabel(techName,
+                    isHeader: false, textColor: Colors.white),
+                _buildTableCellLabel("${distances.length}",
+                    isHeader: false, isMono: true, textColor: Colors.white70),
+                _buildTableCellLabel("${techAvg.toStringAsFixed(2)}m",
+                    isHeader: false, isMono: true, textColor: Colors.white),
+                _buildTableCellLabel(deltaStr,
+                    isHeader: false, isMono: true, textColor: deltaColor),
+              ],
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTableCellLabel(String content,
+      {required bool isHeader, bool isMono = false, required Color textColor}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 12.0),
+      child: Text(
+        content,
+        style: TextStyle(
+          fontSize: isHeader ? 9 : 12,
+          fontWeight: isHeader ? FontWeight.bold : FontWeight.normal,
+          fontFamily: isMono ? 'Courier' : null,
+          color: textColor,
+        ),
+        textAlign: TextAlign.left,
       ),
     );
   }
@@ -1425,19 +1580,22 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
                           bool isSelected = _activeTimeFilter == windowName;
                           return Padding(
                             padding: const EdgeInsets.only(right: 6.0),
-                            child: ChoiceChip(
-                              label: Text(windowName,
-                                  style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                      color: isSelected
-                                          ? Colors.black
-                                          : Colors.white70)),
-                              selected: isSelected,
-                              selectedColor: dynamicAccent,
-                              backgroundColor: const Color(0xFF1E221F),
-                              onSelected: (s) => setState(
-                                  () => _activeTimeFilter = windowName),
+                            child: Theme(
+                              data: ThemeData.dark()
+                                  .copyWith(canvasColor: Colors.transparent),
+                              child: ChoiceChip(
+                                label: Text(windowName,
+                                    style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                        color: isSelected
+                                            ? Colors.black
+                                            : Colors.white70)),
+                                selected: isSelected,
+                                selectedColor: dynamicAccent,
+                                onSelected: (s) => setState(
+                                    () => _activeTimeFilter = windowName),
+                              ),
                             ),
                           );
                         }).toList(),
@@ -1451,19 +1609,22 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
                           bool isSelected = _activeTechniqueFilter == tName;
                           return Padding(
                             padding: const EdgeInsets.only(right: 6.0),
-                            child: ChoiceChip(
-                              label: Text(tName,
-                                  style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.bold,
-                                      color: isSelected
-                                          ? Colors.black
-                                          : Colors.white60)),
-                              selected: isSelected,
-                              selectedColor: dynamicAccent.withOpacity(0.8),
-                              backgroundColor: const Color(0xFF2C3530),
-                              onSelected: (s) => setState(
-                                  () => _activeTechniqueFilter = tName),
+                            child: Theme(
+                              data: ThemeData.dark()
+                                  .copyWith(canvasColor: Colors.transparent),
+                              child: ChoiceChip(
+                                label: Text(tName,
+                                    style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: isSelected
+                                            ? Colors.black
+                                            : Colors.white60)),
+                                selected: isSelected,
+                                selectedColor: dynamicAccent.withOpacity(0.8),
+                                onSelected: (s) => setState(
+                                    () => _activeTechniqueFilter = tName),
+                              ),
                             ),
                           );
                         }).toList(),
@@ -1520,7 +1681,15 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
                   ]),
                 ],
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 24),
+              Text("MOVEMENT VARIANT DELTA METRICS",
+                  style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: dynamicAccent,
+                      letterSpacing: 1.2)),
+              _buildTechniqueEfficiencyMatrixTable(discipline, dynamicAccent),
+              const SizedBox(height: 10),
               Text("${_activeTimeFilter.toUpperCase()} CALCULATIONS GRID",
                   style: TextStyle(
                       fontSize: 12,
