@@ -594,7 +594,6 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
     return 20.00;
   }
 
-// Unified dynamic management callback replacing legacy multi-tier selection entries
   void _showProfileSelectionModal() {
     showDialog(
       context: context,
@@ -688,7 +687,6 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
                 letterSpacing: 2.8,
                 color: Color(0xFFEEE3D3))),
         actions: [
-// Substituted PopupMenuButton completely with high-contrast icon toggle dialogue nodes
           TextButton.icon(
             onPressed: _showProfileSelectionModal,
             icon: Icon(Icons.arrow_drop_down, color: currentAccentColor),

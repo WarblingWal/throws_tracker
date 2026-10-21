@@ -22,7 +22,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -49,7 +49,8 @@ class DatabaseHelper {
         loggedDistance REAL NOT NULL,
         activeWeight REAL NOT NULL,
         projectedDistance REAL NOT NULL,
-        timestamp TEXT NOT NULL
+        timestamp TEXT NOT NULL,
+        technique TEXT NOT NULL DEFAULT 'Standing Throw'
       )
     ''');
   }
@@ -63,19 +64,34 @@ class DatabaseHelper {
         debugPrint("Database migration column safety bypass: $e");
       }
     }
+    if (oldVersion < 3) {
+      try {
+        await db.execute(
+            "ALTER TABLE throws ADD COLUMN technique TEXT NOT NULL DEFAULT 'Standing Throw'");
+      } catch (e) {
+        debugPrint("Database migration technique column safety bypass: $e");
+      }
+    }
   }
 
-  Future<int> createProfile(String username, String sex, String ageGroup,
+  // Strictly typed as Future<bool> to align with state profile instantiation expectations
+  Future<bool> createProfile(String username, String sex, String ageGroup,
       {String country = 'United Kingdom (UK)'}) async {
-    final db = await instance.database;
-    final profileData = {
-      'username': username,
-      'sex': sex,
-      'ageGroup': ageGroup,
-      'country': country,
-      'isActive': 0,
-    };
-    return await db.insert('user_profile', profileData);
+    try {
+      final db = await instance.database;
+      final profileData = {
+        'username': username,
+        'sex': sex,
+        'ageGroup': ageGroup,
+        'country': country,
+        'isActive': 0,
+      };
+      final rowId = await db.insert('user_profile', profileData);
+      return rowId > 0;
+    } catch (e) {
+      debugPrint("Profile creation engine error: $e");
+      return false;
+    }
   }
 
   Future<List<Map<String, dynamic>>> getAllProfiles() async {
@@ -107,6 +123,7 @@ class DatabaseHelper {
     await db.update('user_profile', {'isActive': 0}, where: 'isActive = 1');
   }
 
+  // Explicitly binds required technique parameter layout blocks
   Future<int> insertThrow({
     required int userId,
     required String discipline,
@@ -114,6 +131,7 @@ class DatabaseHelper {
     required double loggedDistance,
     required double activeWeight,
     required double projectedDistance,
+    required String technique,
   }) async {
     final db = await instance.database;
     final dataRow = {
@@ -124,6 +142,7 @@ class DatabaseHelper {
       'activeWeight': activeWeight,
       'projectedDistance': projectedDistance,
       'timestamp': DateTime.now().toIso8601String(),
+      'technique': technique,
     };
     return await db.insert('throws', dataRow);
   }
