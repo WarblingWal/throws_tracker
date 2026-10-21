@@ -77,6 +77,10 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
   int _activeMenuIndex = 0;
   String _selectedDivision = "M55";
 
+  // Globalized Onboarding Session State Persistence Fields
+  String _onboardingSelectedSex = "M";
+  String _onboardingSelectedAge = "55";
+
   final List<String> _disciplines = [
     'Discus',
     'Shot Put',
@@ -138,7 +142,6 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
         monthlyAvg: 18.90,
         yearlyAvg: 18.10),
   };
-
   late stt.SpeechToText _speechEngine;
   bool _isVoiceListening = false;
   String _voiceWordsTranscribed =
@@ -205,11 +208,13 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
     for (String discipline in _disciplines) {
       final throwMaps =
           await db.fetchThrowsForUser(_currentActiveUser!.id, discipline);
+
+      // Upgraded with flexible type parsing to protect against whole-number type casting crashes
       List<ThrowEntry> entries = throwMaps
           .map((m) => ThrowEntry(
-                loggedDistance: m['loggedDistance'] as double,
-                activeWeight: m['activeWeight'] as double,
-                projectedDistance: m['projectedDistance'] as double,
+                loggedDistance: (m['loggedDistance'] as num).toDouble(),
+                activeWeight: (m['activeWeight'] as num).toDouble(),
+                projectedDistance: (m['projectedDistance'] as num).toDouble(),
               ))
           .toList();
 
@@ -222,18 +227,10 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
   double _getStandardWeight(String discipline, String division) {
     bool isMale = division.startsWith('M');
     if (division.contains('55') || division.contains('50')) {
-      if (discipline == 'Discus') {
-        return isMale ? 1.5 : 1.0;
-      }
-      if (discipline == 'Shot Put') {
-        return isMale ? 6.0 : 3.0;
-      }
-      if (discipline == 'Javelin') {
-        return isMale ? 700.0 : 500.0;
-      }
-      if (discipline == 'Hammer') {
-        return isMale ? 6.0 : 3.0;
-      }
+      if (discipline == 'Discus') return isMale ? 1.5 : 1.0;
+      if (discipline == 'Shot Put') return isMale ? 6.0 : 3.0;
+      if (discipline == 'Javelin') return isMale ? 700.0 : 500.0;
+      if (discipline == 'Hammer') return isMale ? 6.0 : 3.0;
       return isMale ? 11.34 : 7.26;
     } else if (division.contains('60') ||
         division.contains('65') ||
@@ -242,32 +239,16 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
         division.contains('80') ||
         division.contains('85') ||
         division.contains('90')) {
-      if (discipline == 'Discus') {
-        return isMale ? 1.0 : 0.75;
-      }
-      if (discipline == 'Shot Put') {
-        return isMale ? 5.0 : 2.0;
-      }
-      if (discipline == 'Javelin') {
-        return isMale ? 600.0 : 400.0;
-      }
-      if (discipline == 'Hammer') {
-        return isMale ? 5.0 : 2.0;
-      }
+      if (discipline == 'Discus') return isMale ? 1.0 : 0.75;
+      if (discipline == 'Shot Put') return isMale ? 5.0 : 2.0;
+      if (discipline == 'Javelin') return isMale ? 600.0 : 400.0;
+      if (discipline == 'Hammer') return isMale ? 5.0 : 2.0;
       return isMale ? 9.08 : 5.45;
     }
-    if (discipline == 'Discus') {
-      return isMale ? 2.0 : 1.0;
-    }
-    if (discipline == 'Shot Put') {
-      return isMale ? 7.26 : 4.0;
-    }
-    if (discipline == 'Javelin') {
-      return isMale ? 800.0 : 600.0;
-    }
-    if (discipline == 'Hammer') {
-      return isMale ? 7.26 : 4.0;
-    }
+    if (discipline == 'Discus') return isMale ? 2.0 : 1.0;
+    if (discipline == 'Shot Put') return isMale ? 7.26 : 4.0;
+    if (discipline == 'Javelin') return isMale ? 800.0 : 600.0;
+    if (discipline == 'Hammer') return isMale ? 7.26 : 4.0;
     return isMale ? 15.88 : 9.08;
   }
 
@@ -280,18 +261,10 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
   }
 
   IconData _getDisciplineIcon(String discipline) {
-    if (discipline == 'Discus') {
-      return Icons.album;
-    }
-    if (discipline == 'Shot Put') {
-      return Icons.radio_button_checked;
-    }
-    if (discipline == 'Javelin') {
-      return Icons.navigation;
-    }
-    if (discipline == 'Hammer') {
-      return Icons.gavel;
-    }
+    if (discipline == 'Discus') return Icons.album;
+    if (discipline == 'Shot Put') return Icons.radio_button_checked;
+    if (discipline == 'Javelin') return Icons.navigation;
+    if (discipline == 'Hammer') return Icons.gavel;
     return Icons.ads_click;
   }
 
@@ -309,9 +282,7 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
       }
     }
     matchedUser ??= _currentActiveUser;
-    if (matchedUser == null) {
-      return;
-    }
+    if (matchedUser == null) return;
 
     String? matchedDiscipline;
     if (phrase.contains('discus')) {
@@ -343,9 +314,7 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
     }
 
     double finalDistance = meters + (centimeters / 100.0);
-    if (finalDistance <= 0.0) {
-      return;
-    }
+    if (finalDistance <= 0.0) return;
 
     String targetDiv = "${matchedUser.sex}${matchedUser.ageGroup}";
     double standardW = _getStandardWeight(matchedDiscipline, targetDiv);
@@ -467,6 +436,16 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
                       fontStyle: FontStyle.italic,
                       color: Color(0xFFACBC9A),
                       fontSize: 13),
+                  textAlign: TextAlign.center),
+            ),
+          if (_isVoiceListening && _voiceWordsTranscribed.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(8),
+              color: Colors.redAccent.withOpacity(0.2),
+              child: const Text(
+                  "Listening for fields... Say e.g., 'Enter discus 45 meter'",
+                  style: TextStyle(color: Colors.white, fontSize: 11),
                   textAlign: TextAlign.center),
             ),
           Expanded(
@@ -865,9 +844,7 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
   }
 
   Widget _buildOnboardingScreen() {
-    String selectedSex = "M";
-    String selectedAge = "55";
-    List<String> ages = [
+    List ages = [
       'Sch',
       'Sen',
       '50',
@@ -880,7 +857,6 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
       '85',
       '90'
     ];
-
     return Scaffold(
       body: Center(
         child: SingleChildScrollView(
@@ -920,35 +896,31 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
                         fontWeight: FontWeight.bold,
                         color: Colors.grey)),
                 const SizedBox(height: 6),
-                StatefulBuilder(
-                  builder: (context, setSubState) {
-                    return Row(
-                      children: ["M", "W"].map((s) {
-                        bool active = selectedSex == s;
-                        return Expanded(
-                          child: GestureDetector(
-                            onTap: () => setSubState(() => selectedSex = s),
-                            child: Container(
-                              margin: const EdgeInsets.symmetric(horizontal: 4),
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              decoration: BoxDecoration(
+                Row(
+                  children: ["M", "W"].map((s) {
+                    bool active = _onboardingSelectedSex == s;
+                    return Expanded(
+                      child: GestureDetector(
+                        onTap: () => setState(() => _onboardingSelectedSex = s),
+                        child: Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 4),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          decoration: BoxDecoration(
+                              color: active
+                                  ? const Color(0xFFACBC9A)
+                                  : const Color(0xFF131516),
+                              borderRadius: BorderRadius.circular(8)),
+                          alignment: Alignment.center,
+                          child: Text(s == "M" ? "Male" : "Female",
+                              style: TextStyle(
+                                  fontWeight: FontWeight.bold,
                                   color: active
-                                      ? const Color(0xFFACBC9A)
-                                      : const Color(0xFF131516),
-                                  borderRadius: BorderRadius.circular(8)),
-                              alignment: Alignment.center,
-                              child: Text(s == "M" ? "Male" : "Female",
-                                  style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      color: active
-                                          ? const Color(0xFF131516)
-                                          : Colors.white)),
-                            ),
-                          ),
-                        );
-                      }).toList(),
+                                      ? const Color(0xFF131516)
+                                      : Colors.white)),
+                        ),
+                      ),
                     );
-                  },
+                  }).toList(),
                 ),
                 const SizedBox(height: 16),
                 const Text("AGE MASTER MATRIX GROUP",
@@ -957,58 +929,47 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
                         fontWeight: FontWeight.bold,
                         color: Colors.grey)),
                 const SizedBox(height: 6),
-                StatefulBuilder(
-                  builder: (context, setSubState) {
-                    return Column(
-                      children: [
-                        DropdownButton<String>(
-                          value: selectedAge,
-                          isExpanded: true,
-                          dropdownColor: const Color(0xFF131516),
-                          style: const TextStyle(
-                              color: Color(0xFFACBC9A),
-                              fontWeight: FontWeight.bold),
-                          items: ages
-                              .map((a) => DropdownMenuItem(
-                                  value: a,
-                                  child: Text(a == 'Sch'
-                                      ? "School Bracket"
-                                      : a == 'Sen'
-                                          ? "Senior Bracket"
-                                          : "Masters $a+")))
-                              .toList(),
-                          onChanged: (v) => setSubState(() => selectedAge = v!),
-                        ),
-                        const SizedBox(height: 24),
-                        SizedBox(
-                          width: double.infinity,
-                          height: 46,
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFFACBC9A)),
-                            onPressed: () async {
-                              if (_onboardingNameController.text
-                                  .trim()
-                                  .isNotEmpty) {
-                                final db = DatabaseHelper.instance;
-                                int id = await db.createProfile(
-                                    _onboardingNameController.text.trim(),
-                                    selectedSex,
-                                    selectedAge);
-                                await db.setActiveProfile(id);
-                                _onboardingNameController.clear();
-                                _initializeAppDatabaseAndProfiles();
-                              }
-                            },
-                            child: const Text("INITIALIZE ACCOUNT",
-                                style: TextStyle(
-                                    color: Color(0xFF131516),
-                                    fontWeight: FontWeight.bold)),
-                          ),
-                        ),
-                      ],
-                    );
-                  },
+                DropdownButton(
+                  value: _onboardingSelectedAge,
+                  isExpanded: true,
+                  dropdownColor: const Color(0xFF131516),
+                  style: const TextStyle(
+                      color: Color(0xFFACBC9A), fontWeight: FontWeight.bold),
+                  onChanged: (v) => setState(() => _onboardingSelectedAge = v!),
+                  items: ages
+                      .map((a) => DropdownMenuItem(
+                          value: a,
+                          child: Text(a == 'Sch'
+                              ? "School Bracket"
+                              : a == 'Sen'
+                                  ? "Senior Bracket"
+                                  : "Masters $a+")))
+                      .toList(),
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  height: 46,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFACBC9A)),
+                    onPressed: () async {
+                      if (_onboardingNameController.text.trim().isNotEmpty) {
+                        final db = DatabaseHelper.instance;
+                        int id = await db.createProfile(
+                            _onboardingNameController.text.trim(),
+                            _onboardingSelectedSex,
+                            _onboardingSelectedAge);
+                        await db.setActiveProfile(id);
+                        _onboardingNameController.clear();
+                        _initializeAppDatabaseAndProfiles();
+                      }
+                    },
+                    child: const Text("INITIALIZE ACCOUNT",
+                        style: TextStyle(
+                            color: Color(0xFF131516),
+                            fontWeight: FontWeight.bold)),
+                  ),
                 ),
               ],
             ),
