@@ -258,9 +258,7 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
     if (discipline == 'Hammer') return Icons.gavel;
     return Icons.ads_click;
   }
-}
 
-extension MainNavigationHubVoiceAndUI on _MainNavigationHubState {
   void _parseVoiceCommand(String rawSentence) async {
     String phrase = rawSentence.toLowerCase();
     if (!phrase.contains('enter') && !phrase.contains('throw')) return;
@@ -382,6 +380,140 @@ extension MainNavigationHubVoiceAndUI on _MainNavigationHubState {
     }
   }
 
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+          body: Center(
+              child: CircularProgressIndicator(color: Color(0xFFACBC9A))));
+    }
+    if (_currentActiveUser == null) return _buildOnboardingScreen();
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text(
+          'THROWS HUB PRO',
+          style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              fontFamily: 'Courier',
+              letterSpacing: 2),
+        ),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(48),
+          child: Container(
+            color: const Color(0xFF2C3530),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _buildTopNavTab(0, 'Overview', Icons.dashboard),
+                  ...List.generate(_disciplines.length, (index) {
+                    final d = _disciplines[index];
+                    return _buildTopNavTab(index + 1, d, _getDisciplineIcon(d));
+                  }),
+                ],
+              ),
+            ),
+          ),
+        ),
+        actions: [
+          PopupMenuButton<String>(
+            onSelected: (value) async {
+              if (value == 'NEW_USER_ACTION') {
+                await DatabaseHelper.instance.clearActiveProfile();
+                _initializeAppDatabaseAndProfiles();
+              } else {
+                int profileId = int.parse(value);
+                await DatabaseHelper.instance.setActiveProfile(profileId);
+                _initializeAppDatabaseAndProfiles();
+              }
+            },
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: Row(
+                children: [
+                  Text(
+                    "${_currentActiveUser!.username} ($_selectedDivision)",
+                    style: const TextStyle(
+                        color: Color(0xFFACBC9A),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12),
+                  ),
+                  const Icon(Icons.arrow_drop_down, color: Color(0xFFACBC9A)),
+                ],
+              ),
+            ),
+            itemBuilder: (BuildContext context) {
+              return [
+                ..._allProfiles.map((profile) {
+                  return PopupMenuItem<String>(
+                    value: profile.id.toString(),
+                    child: Row(
+                      children: [
+                        Icon(Icons.person,
+                            size: 18,
+                            color: profile.id == _currentActiveUser!.id
+                                ? const Color(0xFFACBC9A)
+                                : Colors.grey),
+                        const SizedBox(width: 8),
+                        Text(profile.username,
+                            style: TextStyle(
+                                fontWeight: profile.id == _currentActiveUser!.id
+                                    ? FontWeight.bold
+                                    : FontWeight.normal)),
+                      ],
+                    ),
+                  );
+                }),
+                const PopupMenuDivider(),
+                const PopupMenuItem<String>(
+                  value: 'NEW_USER_ACTION',
+                  child: Row(
+                    children: [
+                      Icon(Icons.add, size: 18, color: Color(0xFFACBC9A)),
+                      SizedBox(width: 8),
+                      Text("New User...",
+                          style: TextStyle(color: Color(0xFFACBC9A))),
+                    ],
+                  ),
+                ),
+              ];
+            },
+          ),
+        ],
+      ),
+      floatingActionButton: FloatingActionButton(
+        backgroundColor:
+            _isVoiceListening ? Colors.redAccent : const Color(0xFFACBC9A),
+        onPressed: _toggleVoiceListening,
+        child: Icon(_isVoiceListening ? Icons.mic : Icons.mic_none,
+            color: const Color(0xFF131516)),
+      ),
+      body: Column(
+        children: [
+          if (_isVoiceListening)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              color: const Color(0xFF1E221F),
+              child: Text(_voiceWordsTranscribed,
+                  style: const TextStyle(
+                      fontStyle: FontStyle.italic,
+                      color: Color(0xFFACBC9A),
+                      fontSize: 13),
+                  textAlign: TextAlign.center),
+            ),
+          Expanded(
+            child: _activeMenuIndex == 0
+                ? _buildDashboardMatrixOverview()
+                : _buildDisciplineLayout(_disciplines[_activeMenuIndex - 1]),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildTopNavTab(int index, String label, IconData icon) {
     bool isSelected = _activeMenuIndex == index;
     return InkWell(
@@ -437,8 +569,18 @@ extension MainNavigationHubVoiceAndUI on _MainNavigationHubState {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                NavigatorRow(
-                    title: d.toUpperCase(), icon: _getDisciplineIcon(d)),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(d.toUpperCase(),
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                            letterSpacing: 1)),
+                    Icon(_getDisciplineIcon(d),
+                        color: const Color(0xFFACBC9A), size: 18),
+                  ],
+                ),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -463,28 +605,7 @@ extension MainNavigationHubVoiceAndUI on _MainNavigationHubState {
       },
     );
   }
-}
 
-class NavigatorRow extends StatelessWidget {
-  final String title;
-  final IconData icon;
-  const NavigatorRow({super.key, required this.title, required this.icon});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(title,
-            style: const TextStyle(
-                fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 1)),
-        Icon(icon, color: const Color(0xFFACBC9A), size: 18),
-      ],
-    );
-  }
-}
-
-extension MainNavigationHubViewComposers on _MainNavigationHubState {
   Widget _buildDisciplineLayout(String discipline) {
     return DefaultTabController(
       length: 2,
@@ -695,8 +816,9 @@ extension MainNavigationHubViewComposers on _MainNavigationHubState {
         shrinkWrap: true,
         itemCount: feed.length,
         itemBuilder: (c, index) {
-          final item = feed[index];
-          final int globalAttemptNumber = index + 1;
+          // Reversing retrieval calculation preserves chronological increments (Attempt #1 -> Attempt #N)
+          final item = feed[feed.length - 1 - index];
+          final int globalAttemptNumber = feed.length - index;
           bool hasVariance = item.loggedDistance != item.projectedDistance;
           return ListTile(
             title: Text("Attempt #$globalAttemptNumber",
@@ -944,7 +1066,6 @@ extension MainNavigationHubViewComposers on _MainNavigationHubState {
     );
   }
 
-  Widget _buildOnboardingScreen() => throw UnimplementedError();
   Widget _buildPanelStatNode(String label, String value, Color textAccent) {
     return Column(
       children: [
