@@ -1,10 +1,10 @@
-<manifest xmlns:android="http://android.com">
+﻿<manifest xmlns:android="http://android.com">
 
     <uses-permission android:name="android.permission.INTERNET" />
 
     <application
         android:label="Throws Hub Pro"
-        android:name="${applicationName}"
+        android:name="\"
         android:icon="@mipmap/ic_launcher">
         
         <activity
