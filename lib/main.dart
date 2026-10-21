@@ -1,6 +1,27 @@
+import 'dart:io' as io;
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'database_helper.dart';
+
+// 🛠️ Programmatic patch to fix any dynamic stripping during compilation
+void fixManifestBeforeBuild() {
+  final io.File manifestFile =
+      io.File('android/app/src/main/AndroidManifest.xml');
+  if (manifestFile.existsSync()) {
+    String content = manifestFile.readAsStringSync();
+
+    // Forcibly rewrite raw keys back into standard prefixed attributes
+    content = content.replaceAll(
+        'uses-permission name=', 'uses-permission android:name=');
+    content = content.replaceAll('<activity name=', '<activity android:name=');
+    content =
+        content.replaceAll('<meta-data name=', '<meta-data android:name=');
+    content = content.replaceAll('<action name=', '<action android:name=');
+    content = content.replaceAll('<category name=', '<category android:name=');
+
+    manifestFile.writeAsStringSync(content);
+  }
+}
 
 void main() => runApp(const ThrowsTrackerApp());
 
