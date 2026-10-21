@@ -13,9 +13,14 @@ class ThrowsTrackerApp extends StatelessWidget {
       title: 'Throws Hub Pro',
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark().copyWith(
-        scaffoldBackgroundColor: const Color(0xFF131516),
+        // Upgraded to a premium Scandinavian Sage-Earth tone base palette
+        scaffoldBackgroundColor: const Color(0xFF2C3530),
         primaryColor: const Color(0xFFACBC9A),
-        cardColor: const Color(0xFF1E2022),
+        cardColor: const Color(0xFF1E221F),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: const Color(0xFF1E221F),
+          elevation: 0,
+        ),
       ),
       home: const MainNavigationHub(),
     );
@@ -77,7 +82,6 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
   int _activeMenuIndex = 0;
   String _selectedDivision = "M55";
 
-  // Globalized Onboarding Session State Persistence Fields
   String _onboardingSelectedSex = "M";
   String _onboardingSelectedAge = "55";
 
@@ -209,7 +213,7 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
       final throwMaps =
           await db.fetchThrowsForUser(_currentActiveUser!.id, discipline);
 
-      // Upgraded with flexible type parsing to protect against whole-number type casting crashes
+      // Explicit (m['field'] as num).toDouble() prevents runtime casting exceptions on integers
       List<ThrowEntry> entries = throwMaps
           .map((m) => ThrowEntry(
                 loggedDistance: (m['loggedDistance'] as num).toDouble(),
@@ -385,36 +389,104 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-            'Throws Hub Pro: ${_currentActiveUser!.username} ($_selectedDivision)',
-            style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                fontFamily: 'Courier')),
-        backgroundColor: const Color(0xFF1E2022),
-        elevation: 0,
+        // Clean, technical monospace title header
+        title: const Text(
+          'THROWS HUB PRO',
+          style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              fontFamily: 'Courier',
+              letterSpacing: 2),
+        ),
+        // 🔹 Relocated Navigation: Menu items sit directly under the main title header
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(48),
+          child: Container(
+            color: const Color(0xFF2C3530),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _buildTopNavTab(0, 'Overview', Icons.dashboard),
+                  ...List.generate(_disciplines.length, (index) {
+                    final d = _disciplines[index];
+                    return _buildTopNavTab(index + 1, d, _getDisciplineIcon(d));
+                  }),
+                ],
+              ),
+            ),
+          ),
+        ),
+        // 🔹 Dropdown Gateway: Active athlete account switcher pinned to the top right corner
         actions: [
-          IconButton(
-            icon: const Icon(Icons.swap_horiz, color: Color(0xFFACBC9A)),
-            onPressed: () async {
-              await DatabaseHelper.instance.clearActiveProfile();
-              _initializeAppDatabaseAndProfiles();
+          PopupMenuButton<String>(
+            onSelected: (value) async {
+              if (value == 'NEW_USER_ACTION') {
+                await DatabaseHelper.instance.clearActiveProfile();
+                _initializeAppDatabaseAndProfiles();
+              } else {
+                int profileId = int.parse(value);
+                await DatabaseHelper.instance.setActiveProfile(profileId);
+                _initializeAppDatabaseAndProfiles();
+              }
             },
-          )
-        ],
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _activeMenuIndex,
-        selectedItemColor: const Color(0xFFACBC9A),
-        unselectedItemColor: const Color(0xFF6C7075),
-        backgroundColor: const Color(0xFF1E2022),
-        type: BottomNavigationBarType.fixed,
-        onTap: (index) => setState(() => _activeMenuIndex = index),
-        items: [
-          const BottomNavigationBarItem(
-              icon: Icon(Icons.dashboard), label: 'Overview'),
-          ..._disciplines.map((d) => BottomNavigationBarItem(
-              icon: Icon(_getDisciplineIcon(d)), label: d)),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: Row(
+                children: [
+                  Text(
+                    "${_currentActiveUser!.username} ($_selectedDivision)",
+                    style: const TextStyle(
+                        color: Color(0xFFACBC9A),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12),
+                  ),
+                  const Icon(Icons.arrow_drop_down, color: Color(0xFFACBC9A)),
+                ],
+              ),
+            ),
+            itemBuilder: (BuildContext context) {
+              return [
+                ..._allProfiles.map((profile) {
+                  return PopupMenuItem<String>(
+                    value: profile.id.toString(),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.person,
+                          size: 18,
+                          color: profile.id == _currentActiveUser!.id
+                              ? const Color(0xFFACBC9A)
+                              : Colors.grey,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          profile.username,
+                          style: TextStyle(
+                            fontWeight: profile.id == _currentActiveUser!.id
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+                const PopupMenuDivider(),
+                const PopupMenuItem<String>(
+                  value: 'NEW_USER_ACTION',
+                  child: Row(
+                    children: [
+                      Icon(Icons.add, size: 18, color: Color(0xFFACBC9A)),
+                      SizedBox(width: 8),
+                      Text("New User...",
+                          style: TextStyle(color: Color(0xFFACBC9A))),
+                    ],
+                  ),
+                ),
+              ];
+            },
+          ),
         ],
       ),
       floatingActionButton: FloatingActionButton(
@@ -430,22 +502,12 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(12),
-              color: const Color(0xFF1E2022),
+              color: const Color(0xFF1E221F),
               child: Text(_voiceWordsTranscribed,
                   style: const TextStyle(
                       fontStyle: FontStyle.italic,
                       color: Color(0xFFACBC9A),
                       fontSize: 13),
-                  textAlign: TextAlign.center),
-            ),
-          if (_isVoiceListening && _voiceWordsTranscribed.isEmpty)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(8),
-              color: Colors.redAccent.withOpacity(0.2),
-              child: const Text(
-                  "Listening for fields... Say e.g., 'Enter discus 45 meter'",
-                  style: TextStyle(color: Colors.white, fontSize: 11),
                   textAlign: TextAlign.center),
             ),
           Expanded(
@@ -454,6 +516,38 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
                 : _buildDisciplineLayout(_disciplines[_activeMenuIndex - 1]),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildTopNavTab(int index, String label, IconData icon) {
+    bool isSelected = _activeMenuIndex == index;
+    return InkWell(
+      onTap: () => setState(() => _activeMenuIndex = index),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        border: Border(
+          bottom: BorderSide(
+            color: isSelected ? const Color(0xFFACBC9A) : Colors.transparent,
+            width: 2,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(icon,
+                size: 16,
+                color: isSelected ? const Color(0xFFACBC9A) : Colors.grey),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                color: isSelected ? const Color(0xFFACBC9A) : Colors.grey,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -475,7 +569,7 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
           onTap: () => setState(() => _activeMenuIndex = idx + 1),
           child: Container(
             decoration: BoxDecoration(
-                color: const Color(0xFF1E2022),
+                color: const Color(0xFF1E221F),
                 borderRadius: BorderRadius.circular(12)),
             padding: const EdgeInsets.all(14),
             child: Column(
@@ -525,7 +619,7 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
       child: Column(
         children: [
           Container(
-            color: const Color(0xFF131516),
+            color: const Color(0xFF1E221F),
             child: const TabBar(
               indicatorColor: Color(0xFFACBC9A),
               indicatorWeight: 2,
@@ -573,7 +667,7 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
         children: [
           Container(
             decoration: BoxDecoration(
-                color: const Color(0xFF1E2022),
+                color: const Color(0xFF1E221F),
                 borderRadius: BorderRadius.circular(8)),
             padding: const EdgeInsets.all(18),
             child: Row(
@@ -595,7 +689,7 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
           const SizedBox(height: 16),
           Container(
             decoration: BoxDecoration(
-                color: const Color(0xFF1E2022),
+                color: const Color(0xFF1E221F),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: const Color(0xFF383C41))),
             padding: const EdgeInsets.all(14),
@@ -661,7 +755,7 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
           const SizedBox(height: 16),
           Container(
             decoration: BoxDecoration(
-                color: const Color(0xFF1E2022),
+                color: const Color(0xFF1E221F),
                 borderRadius: BorderRadius.circular(8)),
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -673,7 +767,7 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
                   style: const TextStyle(fontSize: 16, fontFamily: 'Courier'),
                   decoration: const InputDecoration(
                       filled: true,
-                      fillColor: Color(0xFF131516),
+                      fillColor: Color(0xFF2C3530),
                       labelText: 'Distance (meters)',
                       labelStyle: TextStyle(fontSize: 13)),
                 ),
@@ -723,7 +817,7 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
     return Container(
       constraints: const BoxConstraints(maxHeight: 200),
       decoration: BoxDecoration(
-          color: const Color(0xFF1E2022),
+          color: const Color(0xFF1E221F),
           borderRadius: BorderRadius.circular(8)),
       child: ListView.builder(
         shrinkWrap: true,
@@ -777,7 +871,7 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
         return Container(
           margin: const EdgeInsets.only(bottom: 12),
           decoration: BoxDecoration(
-              color: const Color(0xFF1E2022),
+              color: const Color(0xFF1E221F),
               borderRadius: BorderRadius.circular(8)),
           child: Column(
             children: [
@@ -864,7 +958,7 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
           child: Container(
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-                color: const Color(0xFF1E2022),
+                color: const Color(0xFF1E221F),
                 borderRadius: BorderRadius.circular(16)),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -885,7 +979,7 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
                   style: const TextStyle(fontFamily: 'Courier'),
                   decoration: const InputDecoration(
                       filled: true,
-                      fillColor: Color(0xFF131516),
+                      fillColor: Color(0xFF2C3530),
                       labelText: "Username / Name",
                       labelStyle: TextStyle(fontSize: 13)),
                 ),
@@ -908,7 +1002,7 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
                           decoration: BoxDecoration(
                               color: active
                                   ? const Color(0xFFACBC9A)
-                                  : const Color(0xFF131516),
+                                  : const Color(0xFF2C3530),
                               borderRadius: BorderRadius.circular(8)),
                           alignment: Alignment.center,
                           child: Text(s == "M" ? "Male" : "Female",
@@ -929,13 +1023,15 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
                         fontWeight: FontWeight.bold,
                         color: Colors.grey)),
                 const SizedBox(height: 6),
+// 🔹 Explicit (value as String) casting applied directly inside the DropdownButton item map layout to prevent compilation kernel failures
                 DropdownButton(
                   value: _onboardingSelectedAge,
                   isExpanded: true,
-                  dropdownColor: const Color(0xFF131516),
+                  dropdownColor: const Color(0xFF1E221F),
                   style: const TextStyle(
                       color: Color(0xFFACBC9A), fontWeight: FontWeight.bold),
-                  onChanged: (v) => setState(() => _onboardingSelectedAge = v!),
+                  onChanged: (v) =>
+                      setState(() => _onboardingSelectedAge = v as String),
                   items: ages
                       .map((a) => DropdownMenuItem(
                           value: a,
