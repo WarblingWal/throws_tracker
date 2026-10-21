@@ -34,3 +34,11 @@ jobs:
         run: flutter build apk --release --android-skip-build-dependency-validation
         env:
           GRADLE_OPTS: "-Dandroid.newDsl=false -Dandroid.suppressUnsupportedCompileSdk=true"
+
+      # 🔹 Added: This step captures your compiled APK file and attaches it to the GitHub dashboard
+      - name: Publish Compiled APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ThrowsHubPro-Release-APK
+          path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
