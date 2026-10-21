@@ -15,6 +15,7 @@ class ThrowsTrackerApp extends StatelessWidget {
       theme: ThemeData.dark().copyWith(
         primaryColor: const Color(0xFFACBC9A),
         cardColor: const Color(0xFF1E221F),
+        scaffoldBackgroundColor: const Color(0xFF131614),
         appBarTheme: const AppBarTheme(
           backgroundColor: Color(0xFF1E221F),
           elevation: 0,
@@ -31,6 +32,7 @@ class ThrowEntry {
   final double activeWeight;
   final double projectedDistance;
   final String timestamp;
+  final String performanceMode;
 
   const ThrowEntry({
     this.id,
@@ -38,6 +40,7 @@ class ThrowEntry {
     required this.activeWeight,
     required this.projectedDistance,
     required this.timestamp,
+    required this.performanceMode,
   });
 }
 
@@ -77,6 +80,8 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
   int _onboardingAgeIdx = 3;
 
   String _activeTimeFilter = "All Time";
+  String _activeModeFilter = "All";
+  String _activeEntryMode = "Training";
 
   final List<String> _countriesList = [
     'United Kingdom (UK)',
@@ -193,7 +198,6 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
 
   double _getStandardWeight(String discipline, String division) {
     final bool isMale = division.startsWith('M');
-
     if (division.contains('55') || division.contains('50')) {
       if (discipline == 'Discus') return isMale ? 1.5 : 1.0;
       if (discipline == 'Shot Put') return isMale ? 6.0 : 3.0;
@@ -201,7 +205,6 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
       if (discipline == 'Hammer') return isMale ? 6.0 : 3.0;
       return isMale ? 11.34 : 7.26;
     }
-
     if (discipline == 'Discus') return isMale ? 2.0 : 1.0;
     if (discipline == 'Shot Put') return isMale ? 7.26 : 4.0;
     if (discipline == 'Javelin') return isMale ? 800.0 : 600.0;
@@ -256,7 +259,7 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
         await _loadSavedUserThrows();
       }
     } catch (e) {
-      debugPrint("Safety database link check bypassed: $e");
+      debugPrint("Database exception caught: $e");
       setState(() => _isLoading = false);
     }
   }
@@ -276,6 +279,10 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
                 projectedDistance: (m['projectedDistance'] as num).toDouble(),
                 timestamp: m['timestamp'] as String? ??
                     DateTime.now().toIso8601String(),
+                performanceMode:
+                    m.containsKey('division') && m['division'] == 'Competition'
+                        ? 'Competition'
+                        : 'Training',
               ))
           .toList();
 
@@ -312,15 +319,19 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
         if (t.loggedDistance > maxAllTime) {
           maxAllTime = t.loggedDistance;
         }
-        if (tDate.year == currentYear) {
-          if (t.loggedDistance > maxSeason) {
-            maxSeason = t.loggedDistance;
-          }
+        if (tDate.year == currentYear && t.loggedDistance > maxSeason) {
+          maxSeason = t.loggedDistance;
         }
 
-        if (tDate.isAfter(weekAgo)) weeklyCounter++;
-        if (tDate.isAfter(monthAgo)) monthlyCounter++;
-        if (tDate.isAfter(yearAgo)) yearlyCounter++;
+        if (tDate.isAfter(weekAgo)) {
+          weeklyCounter++;
+        }
+        if (tDate.isAfter(monthAgo)) {
+          monthlyCounter++;
+        }
+        if (tDate.isAfter(yearAgo)) {
+          yearlyCounter++;
+        }
       }
 
       _lifetimePBs[d] = maxAllTime;
@@ -382,14 +393,19 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
     return Icons.ads_click;
   }
 
-  List _filterDataPointsByTimeWindow(List rawLogs) {
+  List _filterDataPoints(List rawLogs) {
     if (rawLogs.isEmpty) return [];
+    List workingList = List.from(rawLogs);
+    if (_activeModeFilter != "All") {
+      workingList = workingList
+          .where((t) => t.performanceMode == _activeModeFilter)
+          .toList();
+    }
     final DateTime targetBaselineNow = DateTime.now();
-    if (_activeTimeFilter == "Last Session") {
-      if (rawLogs.isEmpty) return [];
+    if (_activeTimeFilter == "Last Session" && workingList.isNotEmpty) {
       final DateTime absoluteLastDate =
-          DateTime.tryParse(rawLogs.last.timestamp) ?? targetBaselineNow;
-      return rawLogs.where((t) {
+          DateTime.tryParse(workingList.last.timestamp) ?? targetBaselineNow;
+      return workingList.where((t) {
         final DateTime tDate =
             DateTime.tryParse(t.timestamp) ?? targetBaselineNow;
         return tDate.day == absoluteLastDate.day &&
@@ -399,26 +415,26 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
     }
     if (_activeTimeFilter == "Last Week") {
       final limit = targetBaselineNow.subtract(const Duration(days: 7));
-      return rawLogs
+      return workingList
           .where((t) => (DateTime.tryParse(t.timestamp) ?? targetBaselineNow)
               .isAfter(limit))
           .toList();
     }
     if (_activeTimeFilter == "Last Month") {
       final limit = targetBaselineNow.subtract(const Duration(days: 30));
-      return rawLogs
+      return workingList
           .where((t) => (DateTime.tryParse(t.timestamp) ?? targetBaselineNow)
               .isAfter(limit))
           .toList();
     }
     if (_activeTimeFilter == "Last Year") {
       final limit = targetBaselineNow.subtract(const Duration(days: 365));
-      return rawLogs
+      return workingList
           .where((t) => (DateTime.tryParse(t.timestamp) ?? targetBaselineNow)
               .isAfter(limit))
           .toList();
     }
-    return rawLogs;
+    return workingList;
   }
 
   @override
@@ -432,10 +448,10 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
       return _buildOnboardingScreen();
     }
     final Color currentCanvasColor = _activeMenuIndex == 0
-        ? const Color(0xFF2C3530)
+        ? const Color(0xFF131614)
         : (_activeMenuIndex <= _disciplines.length
             ? _disciplineBackgrounds[_disciplines[_activeMenuIndex - 1]]!
-            : const Color(0xFF1E2623));
+            : const Color(0xFF1A1D1B));
     final Color currentAccentColor = _activeMenuIndex == 0
         ? const Color(0xFFACBC9A)
         : (_activeMenuIndex <= _disciplines.length
@@ -447,10 +463,11 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
         backgroundColor: const Color(0xFF1E221F),
         title: const Text('THROWS HUB PRO',
             style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
+                fontSize: 19,
+                fontWeight: FontWeight.w900,
                 fontFamily: 'Courier',
-                letterSpacing: 2.5)),
+                letterSpacing: 2.8,
+                color: Color(0xFFEEE3D3))),
         actions: [
           PopupMenuButton(
             onSelected: (value) async {
@@ -587,7 +604,7 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.all(16.0),
+            padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 0.0),
             child: GridView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
@@ -595,7 +612,7 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
                   crossAxisCount: 2,
                   crossAxisSpacing: 12,
                   mainAxisSpacing: 12,
-                  childAspectRatio: 1.35),
+                  childAspectRatio: 1.6),
               itemCount: _disciplines.length,
               itemBuilder: (context, idx) {
                 final d = _disciplines[idx];
@@ -608,10 +625,14 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
                   child: Container(
                     decoration: BoxDecoration(
                         color: const Color(0xFF1E221F),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border(
-                            left: BorderSide(
-                                color: contextCardAccent, width: 4))),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.white10, width: 1.5),
+                        boxShadow: const [
+                          BoxShadow(
+                              color: Colors.black45,
+                              blurRadius: 6,
+                              offset: Offset(0, 3)),
+                        ]),
                     padding: const EdgeInsets.all(12),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -621,12 +642,13 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(d.toUpperCase(),
-                                style: const TextStyle(
+                                style: TextStyle(
                                     fontWeight: FontWeight.bold,
-                                    fontSize: 12,
-                                    letterSpacing: 1)),
+                                    fontSize: 11,
+                                    letterSpacing: 1,
+                                    color: contextCardAccent)),
                             Icon(_getDisciplineIcon(d),
-                                color: contextCardAccent, size: 16),
+                                color: contextCardAccent, size: 14),
                           ],
                         ),
                         Column(
@@ -637,19 +659,19 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
                                     ? "0.00m"
                                     : "${throws.last.loggedDistance.toStringAsFixed(2)}m",
                                 style: const TextStyle(
-                                    fontSize: 18,
+                                    fontSize: 16,
                                     fontFamily: 'Courier',
                                     fontWeight: FontWeight.bold)),
-                            const SizedBox(height: 4),
+                            const SizedBox(height: 2),
                             Row(
                               children: [
                                 Text("PB: ${pb.toStringAsFixed(2)}m",
                                     style: const TextStyle(
-                                        fontSize: 10, color: Colors.grey)),
-                                const SizedBox(width: 8),
+                                        fontSize: 9, color: Colors.grey)),
+                                const SizedBox(width: 6),
                                 Text("SB: ${sb.toStringAsFixed(2)}m",
                                     style: TextStyle(
-                                        fontSize: 10,
+                                        fontSize: 9,
                                         color: contextCardAccent
                                             .withOpacity(0.8))),
                               ],
@@ -665,8 +687,13 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
           ),
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(20),
-            color: const Color(0xFF1E221F),
+            margin: const EdgeInsets.all(16.0),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1E221F),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.white10, width: 1.5),
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -686,7 +713,7 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
                             color: Color(0xFFACBC9A))),
                   ],
                 ),
-                const Divider(height: 24, color: Colors.white12),
+                const Divider(height: 20, color: Colors.white12),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
@@ -699,7 +726,6 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
               ],
             ),
           ),
-          const SizedBox(height: 20),
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 16.0),
             child: Text("VISUAL TRAINING DENSITY MATRIX",
@@ -709,16 +735,17 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
                     letterSpacing: 1.5,
                     color: Colors.white30)),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
             child: Container(
-              height: 100,
+              height: 90,
               width: double.infinity,
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
                   color: const Color(0xFF1E221F),
-                  borderRadius: BorderRadius.circular(12)),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.white10)),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 crossAxisAlignment: CrossAxisAlignment.end,
@@ -729,15 +756,15 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
                       Container(
-                        width: 22,
-                        height: 50 * adaptiveHeightFactor,
+                        width: 24,
+                        height: 45 * adaptiveHeightFactor,
                         decoration: BoxDecoration(
                           color: const Color(0xFFACBC9A)
                               .withOpacity(0.15 + (index * 0.1)),
                           borderRadius: BorderRadius.circular(4),
                         ),
                       ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 4),
                       Text("S${index + 1}",
                           style: const TextStyle(
                               fontSize: 9,
@@ -749,7 +776,7 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
               ),
             ),
           ),
-          const SizedBox(height: 30),
+          const SizedBox(height: 24),
         ],
       ),
     );
@@ -760,10 +787,10 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
       children: [
         Text("$count",
             style: const TextStyle(
-                fontSize: 22,
+                fontSize: 20,
                 fontFamily: 'Courier',
                 fontWeight: FontWeight.bold)),
-        const SizedBox(height: 4),
+        const SizedBox(height: 2),
         Text(subtitle,
             style: const TextStyle(
                 fontSize: 9, color: Colors.grey, fontWeight: FontWeight.bold)),
@@ -808,22 +835,27 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
   }
 
   Widget _buildCurrentSessionView(String discipline, Color dynamicAccent) {
-    final feed = _sessionLogs[discipline]!;
+    final List rawFeed = _sessionLogs[discipline]!;
+    final List filteredFeed = rawFeed
+        .where((t) =>
+            _activeModeFilter == "All" ||
+            t.performanceMode == _activeModeFilter)
+        .toList();
     double standardW = _getStandardWeight(discipline, _selectedDivision);
     double processingW = _customWeightOverrides[discipline] ?? standardW;
-    double sessionAvg = feed.isEmpty
+    double sessionAvg = filteredFeed.isEmpty
         ? 0.0
-        : feed.map((e) => e.loggedDistance).reduce((a, b) => a + b) /
-            feed.length;
+        : filteredFeed.map((e) => e.loggedDistance).reduce((a, b) => a + b) /
+            filteredFeed.length;
     double todaysBest = 0.0;
-    if (feed.isNotEmpty) {
-      todaysBest = feed.first.loggedDistance;
-      for (var e in feed) {
-        if (e.loggedDistance > todaysBest) todaysBest = e.loggedDistance;
+    if (filteredFeed.isNotEmpty) {
+      todaysBest = filteredFeed.first.loggedDistance;
+      for (var e in filteredFeed) {
+        if (e.loggedDistance > todaysBest) {
+          todaysBest = e.loggedDistance;
+        }
       }
     }
-    double meritStandard = _getCountryMeritStandard(
-        _currentActiveUser?.country ?? 'UK', discipline, _selectedDivision);
     double pb = _lifetimePBs[discipline] ?? 0.0;
     double sb = _seasonsBests[discipline] ?? 0.0;
     return SingleChildScrollView(
@@ -831,11 +863,30 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Row(
+            children: ["All", "Training", "Competition"].map((m) {
+              bool isSelected = _activeModeFilter == m;
+              return Padding(
+                padding: const EdgeInsets.only(right: 6.0, bottom: 10.0),
+                child: ChoiceChip(
+                  label: Text(m,
+                      style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: isSelected ? Colors.black : Colors.white)),
+                  selected: isSelected,
+                  selectedColor: dynamicAccent,
+                  backgroundColor: const Color(0xFF1E221F),
+                  onSelected: (s) => setState(() => _activeModeFilter = m),
+                ),
+              );
+            }).toList(),
+          ),
           Container(
             decoration: BoxDecoration(
                 color: const Color(0xFF1E221F),
-                borderRadius: BorderRadius.circular(12)),
-            padding: const EdgeInsets.all(16),
+                borderRadius: BorderRadius.circular(8)),
+            padding: const EdgeInsets.all(14),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
@@ -853,43 +904,6 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
             ),
           ),
           const SizedBox(height: 12),
-          Container(
-            width: double.infinity,
-            decoration: BoxDecoration(
-                color: const Color(0xFF1E221F),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: dynamicAccent.withOpacity(0.3))),
-            padding: const EdgeInsets.all(14),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                        "${_currentActiveUser?.country.toUpperCase()} NATIONAL MERIT BENCHMARK",
-                        style: const TextStyle(
-                            fontSize: 9,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.grey)),
-                    const SizedBox(height: 4),
-                    Text("${meritStandard.toStringAsFixed(2)}m",
-                        style: TextStyle(
-                            fontSize: 16,
-                            fontFamily: 'Courier',
-                            fontWeight: FontWeight.bold,
-                            color: dynamicAccent)),
-                  ],
-                ),
-                Text(
-                    "Standard: ${standardW.toStringAsFixed(1)}${discipline == 'Javelin' ? 'g' : 'kg'}",
-                    style:
-                        const TextStyle(fontSize: 11, color: Colors.white54)),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-// ValueListenableBuilder intercepts updates implicitly, resolving keystroke loop inefficiencies
           ValueListenableBuilder(
             valueListenable: _distanceFieldController,
             builder: (context, val, child) {
@@ -971,9 +985,47 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
           ),
           const SizedBox(height: 12),
           Container(
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
                 color: const Color(0xFF1E221F),
-                borderRadius: BorderRadius.circular(12)),
+                borderRadius: BorderRadius.circular(8)),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text("ENTRY CLASSIFICATION MODE",
+                    style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey)),
+                Row(
+                  children: ["Training", "Competition"].map((mode) {
+                    bool active = _activeEntryMode == mode;
+                    return Padding(
+                      padding: const EdgeInsets.only(left: 6.0),
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor:
+                              active ? dynamicAccent : const Color(0xFF2C302E),
+                          foregroundColor: active ? Colors.black : Colors.white,
+                          textStyle: const TextStyle(
+                              fontSize: 10, fontWeight: FontWeight.bold),
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                        ),
+                        onPressed: () =>
+                            setState(() => _activeEntryMode = mode),
+                        child: Text(mode.toUpperCase()),
+                      ),
+                    );
+                  }).toList(),
+                )
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            decoration: BoxDecoration(
+                color: const Color(0xFF1E221F),
+                borderRadius: BorderRadius.circular(8)),
             padding: const EdgeInsets.all(14),
             child: Row(
               children: [
@@ -1004,7 +1056,7 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
                       await DatabaseHelper.instance.insertThrow(
                         userId: _currentActiveUser!.id,
                         discipline: discipline,
-                        division: _selectedDivision,
+                        division: _activeEntryMode,
                         loggedDistance: loggedDist,
                         activeWeight: processingW,
                         projectedDistance: proj,
@@ -1018,7 +1070,7 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
             ),
           ),
           const SizedBox(height: 14),
-          _buildThrowLogList(feed, discipline, standardW),
+          _buildThrowLogList(filteredFeed, discipline, standardW),
         ],
       ),
     );
@@ -1027,29 +1079,34 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
   Widget _buildThrowLogList(List feed, String discipline, double standardW) {
     if (feed.isEmpty) return const SizedBox();
     return Container(
-      constraints: const BoxConstraints(maxHeight: 250),
+      constraints: const BoxConstraints(maxHeight: 280),
       decoration: BoxDecoration(
           color: const Color(0xFF1E221F),
           borderRadius: BorderRadius.circular(8)),
-      child: ListView.builder(
+      child: ListView.separated(
         shrinkWrap: true,
         itemCount: feed.length,
+        separatorBuilder: (context, index) =>
+            const Divider(height: 1, color: Colors.white12),
         itemBuilder: (c, index) {
           final item = feed[feed.length - 1 - index];
           final int globalAttemptNumber = feed.length - index;
           bool hasOverride = item.activeWeight != standardW;
           return ListTile(
             dense: true,
-            title: Text("Attempt #$globalAttemptNumber",
+            leading: Icon(
+                item.performanceMode == 'Competition'
+                    ? Icons.emoji_events
+                    : Icons.fitness_center,
+                size: 14,
+                color: Colors.white30),
+            title: Text(
+                "Attempt #$globalAttemptNumber [${item.performanceMode}]",
                 style:
                     const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
             subtitle: Text(
                 "Weight: ${item.activeWeight.toStringAsFixed(1)}${discipline == 'Javelin' ? 'g' : 'kg'}${hasOverride ? ' (Custom Override)' : ''}",
-                style: TextStyle(
-                    fontSize: 10,
-                    color: hasOverride
-                        ? _disciplineAccents[discipline]
-                        : Colors.grey)),
+                style: const TextStyle(fontSize: 11, color: Color(0xFF909499))),
             trailing: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.end,
@@ -1062,8 +1119,8 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
                 if (hasOverride)
                   Text("Est: ${item.projectedDistance.toStringAsFixed(2)}m",
                       style: const TextStyle(
-                          fontSize: 9,
-                          color: Colors.white54,
+                          fontSize: 11,
+                          color: Color(0xFF909499),
                           fontFamily: 'Courier')),
               ],
             ),
@@ -1075,7 +1132,7 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
 
   Widget _buildHistoricalChartsView(String discipline, Color dynamicAccent) {
     final rawFeed = _sessionLogs[discipline] ?? [];
-    final filteredFeed = _filterDataPointsByTimeWindow(rawFeed);
+    final filteredFeed = _filterDataPoints(rawFeed);
     double meritStandard = _getCountryMeritStandard(
         _currentActiveUser?.country ?? 'UK', discipline, _selectedDivision);
     final List filterWindows = [
@@ -1098,109 +1155,114 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
       }
       windowAvg = totalSum / filteredFeed.length;
     }
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: filterWindows.map((windowName) {
-                bool isSelected = _activeTimeFilter == windowName;
-                return Padding(
-                  padding: const EdgeInsets.only(right: 6.0),
-                  child: ChoiceChip(
-                    label: Text(windowName,
-                        style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: isSelected ? Colors.black : Colors.white70)),
-                    selected: isSelected,
-                    selectedColor: dynamicAccent,
-                    backgroundColor: const Color(0xFF1E221F),
-                    onSelected: (bool selected) {
-                      if (selected) {
-                        setState(() => _activeTimeFilter = windowName);
-                      }
-                    },
+    return CustomScrollView(
+      slivers: [
+        SliverPadding(
+          padding: const EdgeInsets.all(16.0),
+          sliver: SliverList(
+            delegate: SliverChildListExpandedDelegate([
+              TimeFilterRow(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: filterWindows.map((windowName) {
+                      bool isSelected = _activeTimeFilter == windowName;
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 6.0),
+                        child: ChoiceChip(
+                          label: Text(windowName,
+                              style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: isSelected
+                                      ? Colors.black
+                                      : Colors.white70)),
+                          selected: isSelected,
+                          selectedColor: dynamicAccent,
+                          backgroundColor: const Color(0xFF1E221F),
+                          onSelected: (s) =>
+                              setState(() => _activeTimeFilter = windowName),
+                        ),
+                      );
+                    }).toList(),
                   ),
-                );
-              }).toList(),
-            ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text("${_activeTimeFilter.toUpperCase()} ANALYTICS MATRIX GRAPH",
+                  style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: dynamicAccent,
+                      letterSpacing: 1.2)),
+              const SizedBox(height: 12),
+              Container(
+                height: 240,
+                width: double.infinity,
+                padding: const EdgeInsets.fromLTRB(12, 16, 20, 12),
+                decoration: BoxDecoration(
+                    color: const Color(0xFF1E221F),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.white10)),
+                child: filteredFeed.isEmpty
+                    ? const Center(
+                        child: Text(
+                            "No records caught inside this date frame window.",
+                            style: TextStyle(fontSize: 11, color: Colors.grey)))
+                    : CustomPaint(
+                        painter: TrainingLineChartPainter(
+                            entries: filteredFeed,
+                            targetMerit: meritStandard,
+                            accentColor: dynamicAccent),
+                      ),
+              ),
+              const SizedBox(height: 14),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(children: [
+                    Container(width: 10, height: 10, color: dynamicAccent),
+                    const SizedBox(width: 6),
+                    const Text("Logged Distance",
+                        style: TextStyle(fontSize: 11, color: Colors.grey))
+                  ]),
+                  Row(children: [
+                    Container(width: 10, height: 2, color: Colors.white24),
+                    const SizedBox(width: 6),
+                    const Text("National Merit Threshold",
+                        style: TextStyle(fontSize: 11, color: Colors.grey))
+                  ]),
+                ],
+              ),
+              const SizedBox(height: 20),
+              Text("${_activeTimeFilter.toUpperCase()} CALCULATIONS GRID",
+                  style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: dynamicAccent,
+                      letterSpacing: 1.2)),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                      child: _buildTimelineStatMiniCard("WINDOW PEAK",
+                          "${windowMax.toStringAsFixed(2)}m", dynamicAccent)),
+                  const SizedBox(width: 10),
+                  Expanded(
+                      child: _buildTimelineStatMiniCard(
+                          "WINDOW AVERAGE",
+                          "${windowAvg.toStringAsFixed(2)}m",
+                          const Color(0xFFEEE3D3))),
+                  const SizedBox(width: 10),
+                  Expanded(
+                      child: _buildTimelineStatMiniCard("TOTAL THROWS",
+                          "${filteredFeed.length}", dynamicAccent)),
+                ],
+              )
+            ]),
           ),
-          const SizedBox(height: 16),
-          Text("${_activeTimeFilter.toUpperCase()} TREND GRAPH LINE",
-              style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                  color: dynamicAccent,
-                  letterSpacing: 1.2)),
-          const SizedBox(height: 12),
-          Container(
-            height: 220,
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-                color: const Color(0xFF1E221F),
-                borderRadius: BorderRadius.circular(12)),
-            child: filteredFeed.isEmpty
-                ? const Center(
-                    child: Text(
-                        "No records caught inside this date frame window.",
-                        style: TextStyle(fontSize: 11, color: Colors.grey)))
-                : CustomPaint(
-                    painter: TrainingLineChartPainter(
-                        entries: filteredFeed,
-                        targetMerit: meritStandard,
-                        accentColor: dynamicAccent),
-                  ),
-          ),
-          const SizedBox(height: 14),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(children: [
-                Container(width: 10, height: 10, color: dynamicAccent),
-                const SizedBox(width: 6),
-                const Text("Logged Distance",
-                    style: TextStyle(fontSize: 11, color: Colors.grey))
-              ]),
-              Row(children: [
-                Container(width: 10, height: 2, color: Colors.white24),
-                const SizedBox(width: 6),
-                const Text("National Merit Threshold",
-                    style: TextStyle(fontSize: 11, color: Colors.grey))
-              ]),
-            ],
-          ),
-          const SizedBox(height: 20),
-          Text("${_activeTimeFilter.toUpperCase()} CALCULATIONS GRID",
-              style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                  color: dynamicAccent,
-                  letterSpacing: 1.2)),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                  child: _buildTimelineStatMiniCard("WINDOW PEAK",
-                      "${windowMax.toStringAsFixed(2)}m", dynamicAccent)),
-              const SizedBox(width: 10),
-              Expanded(
-                  child: _buildTimelineStatMiniCard(
-                      "WINDOW AVERAGE",
-                      "${windowAvg.toStringAsFixed(2)}m",
-                      const Color(0xFFEEE3D3))),
-              const SizedBox(width: 10),
-              Expanded(
-                  child: _buildTimelineStatMiniCard(
-                      "TOTAL THROWS", "${filteredFeed.length}", dynamicAccent)),
-            ],
-          )
-        ],
-      ),
+        )
+      ],
     );
   }
 
@@ -1210,7 +1272,8 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
           color: const Color(0xFF1E221F),
-          borderRadius: BorderRadius.circular(8)),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.white10)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1233,50 +1296,76 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
 
   Widget _buildInstructionManualPage(Color accent) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(20.0),
-      child: Container(
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-            color: const Color(0xFF1E221F),
-            borderRadius: BorderRadius.circular(12)),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text("ENGINE MATHEMATICS & FEATURES LOG",
-                style: TextStyle(
-                    color: accent,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 15,
-                    fontFamily: 'Courier',
-                    letterSpacing: 1)),
-            const Divider(height: 20, color: Colors.white12),
-            _buildManualSectionNode("1. Linear-Inverse Performance Mapping",
-                "When logging attempts using custom weight overrides, the engine dynamically estimates performance targets using standard age-group baselines:\n\nFormula: Projected = Logged Distance * (Actual Override Weight / Regional Standard Weight)"),
-            _buildManualSectionNode("2. Regional Merit Benchmarks",
-                "The horizontal line on your analytics trend chart graphs the BMAF/WMA qualifying thresholds. For instance, an M55 Discus competitor maps against a 29.10m target benchmark line."),
-            _buildManualSectionNode("3. Training Density Matrices",
-                "The dashboard matrix bars dynamically monitor activity trends based on the logged entries recorded over the rolling 7-day period."),
-          ],
-        ),
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildProfessionalManualCard(
+              "1. LINEAR-INVERSE PERFORMANCE MAPPING",
+              "When logging attempts using custom weight overrides, the engine dynamically estimates performance standards side-by-side with logged metrics using standard regional age baselines.",
+              "Formula Configuration Matrix:\nProjected Distance = Logged Distance × (Actual Override Weight / Regional Target Base Weight)",
+              accent),
+          _buildProfessionalManualCard(
+              "2. REGIONAL ENTRY BENCHMARKS",
+              "The horizontal benchmark line plotted across your historical analytics trends graphs the official BMAF/WMA qualifying thresholds dynamically.",
+              "Execution Mapping Model:\nFor instance, an active M55 Discus competitor profile tracks performance limits against a strict 29.10m national merit baseline marker.",
+              accent),
+          _buildProfessionalManualCard(
+              "3. TRAINING DENSITY GRAPHING MODEL",
+              "The dashboard matrix bars dynamically monitor cumulative activity densities across a rolling 7-day period to display real-time physical workload feedback.",
+              "Data Metric Layout:\nS1 through S7 represent sequential historical segments tracking metrics density clusters across your logged workout counts.",
+              accent),
+          _buildProfessionalManualCard(
+              "4. PERFORMANCE CLASSIFICATION SEGREGATION",
+              "The integration framework splits data inputs cleanly between specialized Training and Competition categorization blocks.",
+              "Workload Filtering:\nToggle classification models smoothly across the current session index layers or analytics sub-menus to isolate competition results from standard preparation metrics.",
+              accent),
+        ],
       ),
     );
   }
 
-  Widget _buildManualSectionNode(String title, String body) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16.0),
+  Widget _buildProfessionalManualCard(
+      String title, String summary, String details, Color accentColor) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+          color: const Color(0xFF1E221F),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.white10, width: 1.5),
+          boxShadow: const [
+            BoxShadow(
+                color: Colors.black38, blurRadius: 4, offset: Offset(0, 2))
+          ]),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(title,
-              style: const TextStyle(
-                  fontWeight: FontWeight.bold,
+              style: TextStyle(
+                  color: accentColor,
+                  fontWeight: FontWeight.w900,
                   fontSize: 12,
-                  color: Colors.white70)),
-          const SizedBox(height: 6),
-          Text(body,
+                  fontFamily: 'Courier',
+                  letterSpacing: 1)),
+          const Divider(height: 16, color: Colors.white12),
+          Text(summary,
               style: const TextStyle(
-                  fontSize: 11, color: Colors.grey, height: 1.4)),
+                  fontSize: 12, color: Color(0xFFEEE3D3), height: 1.4)),
+          const SizedBox(height: 10),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+                color: Colors.black26, borderRadius: BorderRadius.circular(4)),
+            child: Text(details,
+                style: const TextStyle(
+                    fontSize: 11,
+                    color: Colors.grey,
+                    height: 1.4,
+                    fontStyle: FontStyle.italic)),
+          )
         ],
       ),
     );
@@ -1473,12 +1562,15 @@ class TrainingLineChartPainter extends CustomPainter {
     if (entries.isEmpty) return;
     final paintLine = Paint()
       ..color = accentColor
-      ..strokeWidth = 3.0
+      ..strokeWidth = 2.5
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round;
     final paintDot = Paint()
       ..color = accentColor
       ..style = PaintingStyle.fill;
+    final paintAxis = Paint()
+      ..color = Colors.white10
+      ..strokeWidth = 1.0;
     final paintMerit = Paint()
       ..color = Colors.white24
       ..strokeWidth = 1.5
@@ -1486,24 +1578,39 @@ class TrainingLineChartPainter extends CustomPainter {
     final textPaint = TextPainter(textDirection: TextDirection.ltr);
     double maxDistance = targetMerit;
     double minDistance = targetMerit;
-    if (entries.isNotEmpty) {
-      maxDistance = entries.first.loggedDistance;
-      minDistance = entries.first.loggedDistance;
-      for (var e in entries) {
-        if (e.loggedDistance > maxDistance) maxDistance = e.loggedDistance;
-        if (e.loggedDistance < minDistance) minDistance = e.loggedDistance;
+    for (var e in entries) {
+      if (e.loggedDistance > maxDistance) {
+        maxDistance = e.loggedDistance;
+      }
+      if (e.loggedDistance < minDistance) {
+        minDistance = e.loggedDistance;
       }
     }
     maxDistance = math.max(maxDistance, targetMerit) * 1.15;
-    minDistance = math.max(0.0, minDistance - 5.0);
+    minDistance = math.max(0.0, minDistance - 4.0);
     double range = maxDistance - minDistance;
     if (range <= 0) range = 1.0;
+    int lineCount = 4;
+    for (int i = 0; i <= lineCount; i++) {
+      double factor = i / lineCount;
+      double yPos = size.height - (factor * size.height);
+      double val = minDistance + (factor * range);
+      canvas.drawLine(Offset(0, yPos), Offset(size.width, yPos), paintAxis);
+      textPaint.text = TextSpan(
+          text: "${val.toStringAsFixed(1)}m",
+          style: const TextStyle(color: Colors.white30, fontSize: 8));
+      textPaint.layout();
+      textPaint.paint(canvas, Offset(-26, yPos - 5));
+    }
     double meritY =
         size.height - (((targetMerit - minDistance) / range) * size.height);
     canvas.drawLine(Offset(0, meritY), Offset(size.width, meritY), paintMerit);
     textPaint.text = TextSpan(
-        text: "Merit: ${targetMerit.toStringAsFixed(1)}m",
-        style: const TextStyle(color: Colors.white30, fontSize: 8));
+        text: "MERIT: ${targetMerit.toStringAsFixed(1)}m",
+        style: TextStyle(
+            color: accentColor.withOpacity(0.5),
+            fontSize: 8,
+            fontWeight: FontWeight.bold));
     textPaint.layout();
     textPaint.paint(canvas, Offset(4, meritY - 12));
     double widthSlice = size.width / math.max(1, entries.length - 1);
@@ -1513,7 +1620,7 @@ class TrainingLineChartPainter extends CustomPainter {
       double y = size.height -
           (((entries[i].loggedDistance - minDistance) / range) * size.height);
       points.add(Offset(x, y));
-      canvas.drawCircle(Offset(x, y), 4.0, paintDot);
+      canvas.drawCircle(Offset(x, y), 3.5, paintDot);
     }
     if (points.length > 1) {
       for (int i = 0; i < points.length - 1; i++) {
@@ -1524,4 +1631,27 @@ class TrainingLineChartPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+}
+
+class SliverChildListExpandedDelegate extends SliverChildDelegate {
+  final List children;
+  SliverChildListExpandedDelegate(this.children);
+  @override
+  Widget? build(BuildContext context, int index) {
+    if (index < 0 || index >= children.length) return null;
+    return children[index];
+  }
+
+  @override
+  int get estimatedChildCount => children.length;
+  @override
+  bool shouldRebuild(covariant SliverChildListExpandedDelegate oldDelegate) =>
+      true;
+}
+
+class TimeFilterRow extends StatelessWidget {
+  final Widget child;
+  const TimeFilterRow({super.key, required this.child});
+  @override
+  Widget build(BuildContext context) => child;
 }
