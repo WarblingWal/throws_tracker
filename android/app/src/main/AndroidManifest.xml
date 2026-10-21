@@ -5,7 +5,6 @@
 
     <application
         android:label="Throws Hub Pro"
-        android:name="io.flutter.app.FlutterApplication"
         android:icon="@mipmap/ic_launcher">
         
         <activity
