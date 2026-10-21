@@ -30,12 +30,20 @@ jobs:
       - name: Synchronize Package Dependencies
         run: flutter pub get
 
+      # 🛡️ BRUTE-FORCE MANIFEST SANITIZER:
+      # This step hunts down EVERY manifest in the workspace (including dependencies)
+      # and enforces the exact, non-truncated Android XML schema namespace.
+      - name: Sanitize All Workspace Android Manifest Namespaces
+        run: |
+          find . -name "AndroidManifest.xml" -type f -exec sed -i 's|xmlns:android="http://android.com"|xmlns:android="http://android.com"|g' {} +
+          find . -name "AndroidManifest.xml" -type f -exec sed -i 's|xmlns:android="http://android.com"|xmlns:android="http://android.com"|g' {} +
+
+       Kakao Build Task Execution
       - name: Compile Production Release APK with Toolchain Environment Overrides
         run: flutter build apk --release --no-tree-shake-icons --android-skip-build-dependency-validation
         env:
           GRADLE_OPTS: "-Dandroid.newDsl=false -Dandroid.suppressUnsupportedCompileSdk=true"
 
-      # 🔹 Added: This step captures your compiled APK file and attaches it to the GitHub dashboard
       - name: Publish Compiled APK Artifact
         uses: actions/upload-artifact@v4
         with:
