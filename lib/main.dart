@@ -1148,9 +1148,12 @@ class TrainingLineChartPainter extends CustomPainter {
       ..strokeWidth = 1.5
       ..style = PaintingStyle.stroke;
     final textPaint = TextPainter(textDirection: TextDirection.ltr);
-    double maxDistance = entries.map((e) => e.loggedDistance).reduce(math.max);
+// Explicit .cast() call applied to map arrays to fix math bound compilation errors
+    double maxDistance =
+        entries.map((e) => e.loggedDistance).cast().reduce(math.max);
     maxDistance = math.max(maxDistance, targetMerit) * 1.15;
-    double minDistance = entries.map((e) => e.loggedDistance).reduce(math.min);
+    double minDistance =
+        entries.map((e) => e.loggedDistance).cast().reduce(math.min);
     minDistance = math.max(0.0, minDistance - 5.0);
     double range = maxDistance - minDistance;
     if (range <= 0) range = 1.0;
