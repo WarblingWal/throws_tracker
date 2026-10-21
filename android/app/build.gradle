@@ -6,7 +6,8 @@ plugins {
 
 android {
     namespace "com.example.throws_tracker"
-    compileSdk 34
+    // 🔹 Upgraded to API 36 to perfectly align with modern speech_to_text plugin requirements
+    compileSdk 36
 
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
@@ -20,7 +21,8 @@ android {
     defaultConfig {
         applicationId "com.example.throws_tracker"
         minSdk 21
-        targetSdk 34
+        // 🔹 Upgraded to API 36 to target modern platform optimization models
+        targetSdk 36
         versionCode 1
         versionName "1.0.0"
     }
