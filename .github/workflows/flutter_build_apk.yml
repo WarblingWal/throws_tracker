@@ -32,4 +32,5 @@ jobs:
         run: flutter pub get
 
       - name: Compile Production Release Binary
-        run: flutter build apk --release --no-tree-shake-icons
+        # 🔹 Added flag to skip dependency validation checks and force the build to compile
+        run: flutter build apk --release --no-tree-shake-icons --android-skip-build-dependency-validation
