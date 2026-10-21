@@ -74,7 +74,6 @@ class DatabaseHelper {
     }
   }
 
-  // Strictly typed as Future<bool> to align with state profile instantiation expectations
   Future<bool> createProfile(String username, String sex, String ageGroup,
       {String country = 'United Kingdom (UK)'}) async {
     try {
@@ -123,7 +122,6 @@ class DatabaseHelper {
     await db.update('user_profile', {'isActive': 0}, where: 'isActive = 1');
   }
 
-  // Explicitly binds required technique parameter layout blocks
   Future<int> insertThrow({
     required int userId,
     required String discipline,
@@ -145,6 +143,19 @@ class DatabaseHelper {
       'technique': technique,
     };
     return await db.insert('throws', dataRow);
+  }
+
+  // 🔹 Added: High-contrast data removal database execution engine layer
+  Future<bool> deleteThrow(int id) async {
+    try {
+      final db = await instance.database;
+      final rowsAffected =
+          await db.delete('throws', where: 'id = ?', whereArgs: [id]);
+      return rowsAffected > 0;
+    } catch (e) {
+      debugPrint("Database entry deletion failure: $e");
+      return false;
+    }
   }
 
   Future<List<Map<String, dynamic>>> fetchThrowsForUser(
