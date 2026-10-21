@@ -1,5 +1,5 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'database_helper.dart';
 
 void main() => runApp(const ThrowsTrackerApp());
@@ -13,7 +13,6 @@ class ThrowsTrackerApp extends StatelessWidget {
       title: 'Throws Hub Pro',
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark().copyWith(
-        scaffoldBackgroundColor: const Color(0xFF2C3530),
         primaryColor: const Color(0xFFACBC9A),
         cardColor: const Color(0xFF1E221F),
         appBarTheme: const AppBarTheme(
@@ -31,26 +30,14 @@ class ThrowEntry {
   final double loggedDistance;
   final double activeWeight;
   final double projectedDistance;
+  final String timestamp;
 
   const ThrowEntry({
     this.id,
     required this.loggedDistance,
     required this.activeWeight,
     required this.projectedDistance,
-  });
-}
-
-class HistoricSessionData {
-  final double personalBest;
-  final double weeklyAvg;
-  final double monthlyAvg;
-  final double yearlyAvg;
-
-  const HistoricSessionData({
-    required this.personalBest,
-    required this.weeklyAvg,
-    required this.monthlyAvg,
-    required this.yearlyAvg,
+    required this.timestamp,
   });
 }
 
@@ -59,12 +46,14 @@ class UserProfile {
   final String username;
   final String sex;
   final String ageGroup;
+  final String country;
 
   UserProfile({
     required this.id,
     required this.username,
     required this.sex,
     required this.ageGroup,
+    required this.country,
   });
 }
 
@@ -84,6 +73,20 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
   String _selectedDivision = "M55";
   String _onboardingSelectedSex = "M";
   String _onboardingSelectedAge = "55";
+  String _onboardingSelectedCountry = "United Kingdom (UK)";
+
+  final List<String> _countriesList = [
+    'United Kingdom (UK)',
+    'United States (US)',
+    'Australia',
+    'Canada',
+    'France',
+    'Germany',
+    'Ireland',
+    'New Zealand',
+    'South Africa',
+    'Spain'
+  ];
 
   final List<String> _disciplines = [
     'Discus',
@@ -106,12 +109,23 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
     'Hammer': null,
     'Weight': null
   };
-  final Map<String, int> _expandedAccordionIndex = {
-    'Discus': -1,
-    'Shot Put': -1,
-    'Javelin': -1,
-    'Hammer': -1,
-    'Weight': -1
+
+  // Dynamic Theme Matrix mapping unique Scandinavian background tones per implement
+  final Map<String, Color> _disciplineBackgrounds = {
+    'Discus': const Color(0xFF2C3530), // Rich Organic Moss
+    'Shot Put': const Color(0xFF222B28), // Charcoal Slate-Moss
+    'Javelin': const Color(0xFF343F36), // Deep Forest Sage
+    'Hammer': const Color(0xFF3A3E36), // Muted Organic Umber
+    'Weight': const Color(0xFF1E2623), // Deep Alpine Spruce
+  };
+
+  // Nav bar accent highlight matching arrays
+  final Map<String, Color> _disciplineAccents = {
+    'Discus': const Color(0xFFACBC9A), // Pale Premium Sage
+    'Shot Put': const Color(0xFF9DB2A4), // Silver Moss Silver
+    'Javelin': const Color(0xFFB1C7A3), // Bright Leaf Green
+    'Hammer': const Color(0xFFC2C5A9), // Raw Wheat Umber
+    'Weight': const Color(0xFF8FA89B), // Ice Alpine Teal
   };
 
   final TextEditingController _distanceFieldController =
@@ -119,43 +133,32 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
   final TextEditingController _onboardingNameController =
       TextEditingController();
 
-  final Map<String, HistoricSessionData> _historicalData = {
-    'Discus': const HistoricSessionData(
-        personalBest: 54.20,
-        weeklyAvg: 50.45,
-        monthlyAvg: 49.80,
-        yearlyAvg: 48.90),
-    'Shot Put': const HistoricSessionData(
-        personalBest: 18.40,
-        weeklyAvg: 16.95,
-        monthlyAvg: 16.50,
-        yearlyAvg: 15.80),
-    'Javelin': const HistoricSessionData(
-        personalBest: 68.50,
-        weeklyAvg: 63.80,
-        monthlyAvg: 62.10,
-        yearlyAvg: 60.40),
-    'Hammer': const HistoricSessionData(
-        personalBest: 61.30,
-        weeklyAvg: 57.40,
-        monthlyAvg: 56.20,
-        yearlyAvg: 54.10),
-    'Weight': const HistoricSessionData(
-        personalBest: 21.10,
-        weeklyAvg: 19.40,
-        monthlyAvg: 18.90,
-        yearlyAvg: 18.10),
+  // Metrics Dashboard Variables calculated via aggregate filters
+  final Map<String, double> _lifetimePBs = {
+    'Discus': 0.0,
+    'Shot Put': 0.0,
+    'Javelin': 0.0,
+    'Hammer': 0.0,
+    'Weight': 0.0
+  };
+  final Map<String, double> _seasonsBests = {
+    'Discus': 0.0,
+    'Shot Put': 0.0,
+    'Javelin': 0.0,
+    'Hammer': 0.0,
+    'Weight': 0.0
   };
 
-  late stt.SpeechToText _speechEngine;
-  bool _isVoiceListening = false;
-  String _voiceWordsTranscribed =
-      "Press Microphone to activate voice parsing commands";
+  // Macro Workout History Metrics variables
+  String _lastSessionDisplay = "No Workouts Recorded";
+  int _weeksCount = 0;
+  int _monthsCount = 0;
+  int _yearsCount = 0;
+  int _pbsThisYearCount = 0;
 
   @override
   void initState() {
     super.initState();
-    _speechEngine = stt.SpeechToText();
     _initializeAppDatabaseAndProfiles();
   }
 
@@ -163,7 +166,6 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
   void dispose() {
     _distanceFieldController.dispose();
     _onboardingNameController.dispose();
-    _speechEngine.stop();
     super.dispose();
   }
 
@@ -177,6 +179,9 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
               username: m['username'] as String,
               sex: m['sex'] as String,
               ageGroup: m['ageGroup'] as String,
+              country: m.containsKey('country')
+                  ? (m['country'] as String? ?? 'United Kingdom (UK)')
+                  : 'United Kingdom (UK)',
             ))
         .toList();
 
@@ -189,6 +194,9 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
         username: activeMap['username'] as String,
         sex: activeMap['sex'] as String,
         ageGroup: activeMap['ageGroup'] as String,
+        country: activeMap.containsKey('country')
+            ? (activeMap['country'] as String? ?? 'United Kingdom (UK)')
+            : 'United Kingdom (UK)',
       );
     }
 
@@ -203,7 +211,7 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
     });
 
     if (_currentActiveUser != null) {
-      _loadSavedUserThrows();
+      await _loadSavedUserThrows();
     }
   }
 
@@ -220,13 +228,89 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
                 loggedDistance: (m['loggedDistance'] as num).toDouble(),
                 activeWeight: (m['activeWeight'] as num).toDouble(),
                 projectedDistance: (m['projectedDistance'] as num).toDouble(),
+                timestamp: m['timestamp'] as String? ??
+                    DateTime.now().toIso8601String(),
               ))
           .toList();
 
-      setState(() {
-        _sessionLogs[discipline] = entries;
-      });
+      _sessionLogs[discipline] = entries;
     }
+    _recalculateAllMetricsAndLedgers();
+  }
+
+  void _recalculateAllMetricsAndLedgers() {
+    final int currentYear = DateTime.now().year;
+    final DateTime now = DateTime.now();
+    final DateTime weekAgo = now.subtract(const Duration(days: 7));
+    final DateTime monthAgo = now.subtract(const Duration(days: 30));
+    final DateTime yearAgo = now.subtract(const Duration(days: 365));
+
+    int weeklyCounter = 0;
+    int monthlyCounter = 0;
+    int yearlyCounter = 0;
+    int pbCounter = 0;
+    DateTime? maxTimestamp;
+    List<String> lastSessionDisciplines = [];
+
+    for (String d in _disciplines) {
+      final throws = _sessionLogs[d] ?? [];
+      double maxAllTime = 0.0;
+      double maxSeason = 0.0;
+
+      for (var t in throws) {
+        DateTime tDate = DateTime.tryParse(t.timestamp) ?? DateTime.now();
+
+        // Track unique active session limits
+        if (maxTimestamp == null || tDate.isAfter(maxTimestamp)) {
+          maxTimestamp = tDate;
+        }
+
+        if (t.loggedDistance > maxAllTime) maxAllTime = t.loggedDistance;
+
+        // Match Calendar Year boundaries starting in January
+        if (tDate.year == currentYear) {
+          if (t.loggedDistance > maxSeason) maxSeason = t.loggedDistance;
+        }
+
+        // Aggregate frequency stats
+        if (tDate.isAfter(weekAgo)) weeklyCounter++;
+        if (tDate.isAfter(monthAgo)) monthlyCounter++;
+        if (tDate.isAfter(yearAgo)) yearlyCounter++;
+      }
+
+      _lifetimePBs[d] = maxAllTime;
+      _seasonsBests[d] = maxSeason;
+
+      // Rough estimation of recent incremental milestones
+      if (maxSeason > 0.0 && maxSeason >= maxAllTime) pbCounter++;
+    }
+
+    // Isolate active layout elements
+    if (maxTimestamp != null) {
+      String dateStr =
+          "${maxTimestamp.day.toString().padLeft(2, '0')}/${maxTimestamp.month.toString().padLeft(2, '0')}/${maxTimestamp.year}";
+      for (String d in _disciplines) {
+        final throws = _sessionLogs[d] ?? [];
+        bool thrownThisDay = throws.any((t) {
+          DateTime tDate = DateTime.tryParse(t.timestamp) ?? DateTime.now();
+          return tDate.day == maxTimestamp!.day &&
+              tDate.month == maxTimestamp!.month &&
+              tDate.year == maxTimestamp!.year;
+        });
+        if (thrownThisDay) {
+          lastSessionDisciplines
+              .add(d.substring(0, math.min(3, d.length)).toUpperCase());
+        }
+      }
+      _lastSessionDisplay = "$dateStr (${lastSessionDisciplines.join(', ')})";
+    }
+
+    setState(() {
+      _weeksCount = weeklyCounter;
+      _monthsCount = monthlyCounter;
+      _yearsCount = yearlyCounter;
+      _pbsThisYearCount = pbCounter;
+    });
   }
 
   double _getStandardWeight(String discipline, String division) {
@@ -251,295 +335,100 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
     return distance * (actualW / standardW);
   }
 
-  IconData _getDisciplineIcon(String discipline) {
-    if (discipline == 'Discus') return Icons.album;
-    if (discipline == 'Shot Put') return Icons.radio_button_checked;
-    if (discipline == 'Javelin') return Icons.navigation;
-    if (discipline == 'Hammer') return Icons.gavel;
-    return Icons.ads_click;
-  }
-
-  void _parseVoiceCommand(String rawSentence) async {
-    String phrase = rawSentence.toLowerCase();
-    if (!phrase.contains('enter') && !phrase.contains('throw')) return;
-
-    UserProfile? matchedUser;
-    for (var profile in _allProfiles) {
-      if (phrase.contains(profile.username.toLowerCase())) {
-        matchedUser = profile;
-        break;
+  double _getCountryMeritStandard(
+      String country, String discipline, String division) {
+    bool isMale = division.startsWith('M');
+    bool isM55 = division.contains('55');
+    if (country.contains('United Kingdom') || country.contains('UK')) {
+      if (isM55 && isMale) {
+        if (discipline == 'Discus')
+          return 29.10; // Official British BMAF M55 Merit Standard
+        if (discipline == 'Shot Put') return 9.20;
+        if (discipline == 'Javelin') return 29.50;
+        if (discipline == 'Hammer') return 30.20;
+        if (discipline == 'Weight') return 9.40;
       }
+      return 25.00;
     }
-    matchedUser ??= _currentActiveUser;
-    if (matchedUser == null) return;
-
-    String? matchedDiscipline;
-    if (phrase.contains('discus'))
-      matchedDiscipline = 'Discus';
-    else if (phrase.contains('shot') || phrase.contains('put'))
-      matchedDiscipline = 'Shot Put';
-    else if (phrase.contains('javelin'))
-      matchedDiscipline = 'Javelin';
-    else if (phrase.contains('hammer'))
-      matchedDiscipline = 'Hammer';
-    else if (phrase.contains('weight')) matchedDiscipline = 'Weight';
-
-    matchedDiscipline ??=
-        _activeMenuIndex > 0 ? _disciplines[_activeMenuIndex - 1] : 'Discus';
-
-    double meters = 0.0;
-    double centimeters = 0.0;
-    RegExp meterRegex = RegExp(r'(\d+)\s*meter');
-    RegExp cmRegex = RegExp(r'(\d+)\s*centimeter');
-
-    var meterMatch = meterRegex.firstMatch(phrase);
-    if (meterMatch != null)
-      meters = double.tryParse(meterMatch.group(1) ?? '0') ?? 0.0;
-    var cmMatch = cmRegex.firstMatch(phrase);
-    if (cmMatch != null)
-      centimeters = double.tryParse(cmMatch.group(1) ?? '0') ?? 0.0;
-
-    double finalDistance = meters + (centimeters / 100.0);
-    if (finalDistance <= 0.0) return;
-
-    String targetDiv = "${matchedUser.sex}${matchedUser.ageGroup}";
-    double standardW = _getStandardWeight(matchedDiscipline, targetDiv);
-    double processingW = _customWeightOverrides[matchedDiscipline] ?? standardW;
-    double projectedDist =
-        _calculateProjectedDistance(finalDistance, processingW, standardW);
-
-    await DatabaseHelper.instance.insertThrow(
-      userId: matchedUser.id,
-      discipline: matchedDiscipline,
-      division: targetDiv,
-      loggedDistance: finalDistance,
-      activeWeight: processingW,
-      projectedDistance: projectedDist,
-    );
-
-    if (_currentActiveUser != null &&
-        matchedUser.id == _currentActiveUser!.id) {
-      _loadSavedUserThrows();
-    }
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        backgroundColor: const Color(0xFFACBC9A),
-        content: Text(
-            "Voice Logged for ${matchedUser.username}: $matchedDiscipline -> ${finalDistance.toStringAsFixed(2)}m",
-            style: const TextStyle(
-                color: Color(0xFF131516), fontWeight: FontWeight.bold)),
-      ));
-    }
-  }
-
-  void _toggleVoiceListening() async {
-    if (!_isVoiceListening) {
-      bool available = await _speechEngine.initialize(
-        onStatus: (status) {
-          debugPrint('Speech Status Update: $status');
-          if (status == 'notListening' && _isVoiceListening) {
-            _restartListeningLoop();
-          }
-        },
-        onError: (errorNotification) =>
-            debugPrint('Speech Error: $errorNotification'),
-      );
-      if (available) {
-        setState(() => _isVoiceListening = true);
-        _startListeningExecution();
-      }
-    } else {
-      setState(() => _isVoiceListening = false);
-      _speechEngine.stop();
-    }
-  }
-
-  void _startListeningExecution() {
-    _speechEngine.listen(
-      onResult: (result) {
-        setState(() {
-          _voiceWordsTranscribed = result.recognizedWords;
-          if (result.finalResult) {
-            _parseVoiceCommand(result.recognizedWords);
-          }
-        });
-      },
-      listenFor: const Duration(seconds: 30),
-      pauseFor: const Duration(seconds: 4),
-      partialResults: true,
-    );
-  }
-
-  void _restartListeningLoop() {
-    if (_isVoiceListening) {
-      Future.delayed(const Duration(milliseconds: 250), () {
-        if (_isVoiceListening && !_speechEngine.isListening) {
-          _startListeningExecution();
-        }
-      });
-    }
+    return 20.00;
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
+    if (_isLoading)
       return const Scaffold(
           body: Center(
               child: CircularProgressIndicator(color: Color(0xFFACBC9A))));
-    }
     if (_currentActiveUser == null) return _buildOnboardingScreen();
 
+    // Map context colors based on active tabs selection
+    final Color currentCanvasColor = _activeMenuIndex == 0
+        ? const Color(0xFF2C3530)
+        : _disciplineBackgrounds[_disciplines[_activeMenuIndex - 1]]!;
+    final Color currentAccentColor = _activeMenuIndex == 0
+        ? const Color(0xFFACBC9A)
+        : _disciplineAccents[_disciplines[_activeMenuIndex - 1]]!;
+
     return Scaffold(
+      backgroundColor: currentCanvasColor,
       appBar: AppBar(
-        title: const Text(
-          'THROWS HUB PRO',
-          style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              fontFamily: 'Courier',
-              letterSpacing: 2),
-        ),
+        title: const Text('THROWS HUB PRO',
+            style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'Courier',
+                letterSpacing: 2)),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(48),
           child: Container(
-            color: const Color(0xFF2C3530),
+            color: const Color(0xFF1E221F),
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
                 children: [
-                  _buildTopNavTab(0, 'Overview', Icons.dashboard),
+                  _buildTopNavTab(
+                      0, 'Overview', Icons.dashboard, currentAccentColor),
                   ...List.generate(_disciplines.length, (index) {
                     final d = _disciplines[index];
-                    return _buildTopNavTab(index + 1, d, _getDisciplineIcon(d));
+                    return _buildTopNavTab(index + 1, d, _getDisciplineIcon(d),
+                        currentAccentColor);
                   }),
                 ],
               ),
             ),
           ),
         ),
-        actions: [
-          PopupMenuButton<String>(
-            onSelected: (value) async {
-              if (value == 'NEW_USER_ACTION') {
-                await DatabaseHelper.instance.clearActiveProfile();
-                _initializeAppDatabaseAndProfiles();
-              } else {
-                int profileId = int.parse(value);
-                await DatabaseHelper.instance.setActiveProfile(profileId);
-                _initializeAppDatabaseAndProfiles();
-              }
-            },
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: Row(
-                children: [
-                  Text(
-                    "${_currentActiveUser!.username} ($_selectedDivision)",
-                    style: const TextStyle(
-                        color: Color(0xFFACBC9A),
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12),
-                  ),
-                  const Icon(Icons.arrow_drop_down, color: Color(0xFFACBC9A)),
-                ],
-              ),
-            ),
-            itemBuilder: (BuildContext context) {
-              return [
-                ..._allProfiles.map((profile) {
-                  return PopupMenuItem<String>(
-                    value: profile.id.toString(),
-                    child: Row(
-                      children: [
-                        Icon(Icons.person,
-                            size: 18,
-                            color: profile.id == _currentActiveUser!.id
-                                ? const Color(0xFFACBC9A)
-                                : Colors.grey),
-                        const SizedBox(width: 8),
-                        Text(profile.username,
-                            style: TextStyle(
-                                fontWeight: profile.id == _currentActiveUser!.id
-                                    ? FontWeight.bold
-                                    : FontWeight.normal)),
-                      ],
-                    ),
-                  );
-                }),
-                const PopupMenuDivider(),
-                const PopupMenuItem<String>(
-                  value: 'NEW_USER_ACTION',
-                  child: Row(
-                    children: [
-                      Icon(Icons.add, size: 18, color: Color(0xFFACBC9A)),
-                      SizedBox(width: 8),
-                      Text("New User...",
-                          style: TextStyle(color: Color(0xFFACBC9A))),
-                    ],
-                  ),
-                ),
-              ];
-            },
-          ),
-        ],
       ),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor:
-            _isVoiceListening ? Colors.redAccent : const Color(0xFFACBC9A),
-        onPressed: _toggleVoiceListening,
-        child: Icon(_isVoiceListening ? Icons.mic : Icons.mic_none,
-            color: const Color(0xFF131516)),
-      ),
-      body: Column(
-        children: [
-          if (_isVoiceListening)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              color: const Color(0xFF1E221F),
-              child: Text(_voiceWordsTranscribed,
-                  style: const TextStyle(
-                      fontStyle: FontStyle.italic,
-                      color: Color(0xFFACBC9A),
-                      fontSize: 13),
-                  textAlign: TextAlign.center),
-            ),
-          Expanded(
-            child: _activeMenuIndex == 0
-                ? _buildDashboardMatrixOverview()
-                : _buildDisciplineLayout(_disciplines[_activeMenuIndex - 1]),
-          ),
-        ],
-      ),
+      body: _activeMenuIndex == 0
+          ? _buildDashboardMatrixOverview()
+          : _buildDisciplineLayout(
+              _disciplines[_activeMenuIndex - 1], currentAccentColor),
     );
   }
 
-  Widget _buildTopNavTab(int index, String label, IconData icon) {
+  Widget _buildTopNavTab(
+      int index, String label, IconData icon, Color dynamicAccent) {
     bool isSelected = _activeMenuIndex == index;
     return InkWell(
       onTap: () => setState(() => _activeMenuIndex = index),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
-          border: Border(
-            bottom: BorderSide(
-              color: isSelected ? const Color(0xFFACBC9A) : Colors.transparent,
-              width: 2,
-            ),
-          ),
-        ),
+            border: Border(
+                bottom: BorderSide(
+                    color: isSelected ? dynamicAccent : Colors.transparent,
+                    width: 2.5))),
         child: Row(
           children: [
             Icon(icon,
-                size: 16,
-                color: isSelected ? const Color(0xFFACBC9A) : Colors.grey),
+                size: 16, color: isSelected ? dynamicAccent : Colors.grey),
             const SizedBox(width: 6),
             Text(label,
                 style: TextStyle(
                     fontSize: 12,
                     fontWeight:
                         isSelected ? FontWeight.bold : FontWeight.normal,
-                    color: isSelected ? const Color(0xFFACBC9A) : Colors.grey)),
+                    color: isSelected ? dynamicAccent : Colors.grey)),
           ],
         ),
       ),
@@ -547,78 +436,163 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
   }
 
   Widget _buildDashboardMatrixOverview() {
-    return GridView.builder(
-      padding: const EdgeInsets.all(16),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          crossAxisSpacing: 12,
-          mainAxisSpacing: 12,
-          childAspectRatio: 1.1),
-      itemCount: _disciplines.length,
-      itemBuilder: (context, idx) {
-        final d = _disciplines[idx];
-        final throws = _sessionLogs[d] ?? [];
-        return GestureDetector(
-          onTap: () => setState(() => _activeMenuIndex = idx + 1),
-          child: Container(
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            // Slightly shorter vertically via proportional grid overrides (1.35 aspect factor)
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
+                childAspectRatio: 1.35),
+            itemCount: _disciplines.length,
+            itemBuilder: (context, idx) {
+              final d = _disciplines[idx];
+              final throws = _sessionLogs[d] ?? [];
+              final double pb = _lifetimePBs[d] ?? 0.0;
+              final double sb = _seasonsBests[d] ?? 0.0;
+              final Color contextCardAccent = _disciplineAccents[d]!;
+
+              return GestureDetector(
+                onTap: () => setState(() => _activeMenuIndex = idx + 1),
+                child: Container(
+                  decoration: BoxDecoration(
+                      color: const Color(0xFF1E221F),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border(
+                          left:
+                              BorderSide(color: contextCardAccent, width: 4))),
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(d.toUpperCase(),
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                  letterSpacing: 1)),
+                          Icon(_getDisciplineIcon(d),
+                              color: contextCardAccent, size: 16),
+                        ],
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                              throws.isEmpty
+                                  ? "0.00m"
+                                  : "${throws.last.loggedDistance.toStringAsFixed(2)}m",
+                              style: const TextStyle(
+                                  fontSize: 18,
+                                  fontFamily: 'Courier',
+                                  fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Text("PB: ${pb.toStringAsFixed(2)}m",
+                                  style: const TextStyle(
+                                      fontSize: 10, color: Colors.grey)),
+                              const SizedBox(width: 8),
+                              Text("SB: ${sb.toStringAsFixed(2)}m",
+                                  style: TextStyle(
+                                      fontSize: 10,
+                                      color:
+                                          contextCardAccent.withOpacity(0.8))),
+                            ],
+                          )
+                        ],
+                      )
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 20),
+          const Text("HISTORICAL WORKOUT STATS & PROGRESSION",
+              style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.5,
+                  color: Color(0xFFACBC9A))),
+          const SizedBox(height: 10),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
                 color: const Color(0xFF1E221F),
                 borderRadius: BorderRadius.circular(12)),
-            padding: const EdgeInsets.all(14),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(d.toUpperCase(),
+                    const Text("Last Active Training Session:",
+                        style: TextStyle(fontSize: 12, color: Colors.white70)),
+                    Text(_lastSessionDisplay,
                         style: const TextStyle(
+                            fontSize: 12,
+                            fontFamily: 'Courier',
                             fontWeight: FontWeight.bold,
-                            fontSize: 13,
-                            letterSpacing: 1)),
-                    Icon(_getDisciplineIcon(d),
-                        color: const Color(0xFFACBC9A), size: 18),
+                            color: Color(0xFFACBC9A))),
                   ],
                 ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                const Divider(height: 24, color: Colors.white12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
-                    Text(
-                        throws.isEmpty
-                            ? "0.00m"
-                            : "${throws.last.loggedDistance.toStringAsFixed(2)}m",
-                        style: const TextStyle(
-                            fontSize: 22,
-                            fontFamily: 'Courier',
-                            fontWeight: FontWeight.w400)),
-                    const SizedBox(height: 2),
-                    Text("Total Attempts: ${throws.length}",
-                        style:
-                            const TextStyle(fontSize: 10, color: Colors.grey)),
+                    _buildHistoryCounterNode("WEEK", _weeksCount),
+                    _buildHistoryCounterNode("MONTH", _monthsCount),
+                    _buildHistoryCounterNode("YEAR", _yearsCount),
+                    _buildHistoryCounterNode("ANNUAL PBs", _pbsThisYearCount),
                   ],
                 )
               ],
             ),
-          ),
-        );
-      },
+          )
+        ],
+      ),
     );
   }
 
-  Widget _buildDisciplineLayout(String discipline) {
+  Widget _buildHistoryCounterNode(String subtitle, int count) {
+    return Column(
+      children: [
+        Text("$count",
+            style: const TextStyle(
+                fontSize: 22,
+                fontFamily: 'Courier',
+                fontWeight: FontWeight.bold)),
+        const SizedBox(height: 4),
+        Text(subtitle,
+            style: const TextStyle(
+                fontSize: 9, color: Colors.grey, fontWeight: FontWeight.bold)),
+      ],
+    );
+  }
+
+  Widget _buildDisciplineLayout(String discipline, Color dynamicAccent) {
     return DefaultTabController(
       length: 2,
       child: Column(
         children: [
           Container(
             color: const Color(0xFF1E221F),
-            child: const TabBar(
-              indicatorColor: Color(0xFFACBC9A),
-              indicatorWeight: 2,
-              labelColor: Color(0xFFACBC9A),
-              unselectedLabelColor: Color(0xFF6C7075),
-              tabs: [
+            child: TabBar(
+              indicatorColor: dynamicAccent,
+              labelColor: dynamicAccent,
+              unselectedLabelColor: const Color(0xFF6C7075),
+              tabs: const [
                 Tab(
                     child: Text("Current Session",
                         style: TextStyle(
@@ -633,8 +607,8 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
           Expanded(
             child: TabBarView(
               children: [
-                _buildCurrentSessionView(discipline),
-                _buildHistoricalView(discipline),
+                _buildCurrentSessionView(discipline, dynamicAccent),
+                const Center(child: Text("Analytics Section")),
               ],
             ),
           ),
@@ -643,48 +617,55 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
     );
   }
 
-  Widget _buildCurrentSessionView(String discipline) {
+  Widget _buildCurrentSessionView(String discipline, Color dynamicAccent) {
     final feed = _sessionLogs[discipline]!;
-    final stats = _historicalData[discipline]!;
     double standardW = _getStandardWeight(discipline, _selectedDivision);
     double processingW = _customWeightOverrides[discipline] ?? standardW;
+
     double sessionAvg = feed.isEmpty
         ? 0.0
         : feed.map((e) => e.loggedDistance).reduce((a, b) => a + b) /
             feed.length;
+    double todaysBest =
+        feed.isEmpty ? 0.0 : feed.map((e) => e.loggedDistance).reduce(math.max);
+    double meritStandard = _getCountryMeritStandard(
+        _currentActiveUser?.country ?? 'UK', discipline, _selectedDivision);
+    double pb = _lifetimePBs[discipline] ?? 0.0;
+    double sb = _seasonsBests[discipline] ?? 0.0;
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(20.0),
+      padding: const EdgeInsets.all(16.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
             decoration: BoxDecoration(
                 color: const Color(0xFF1E221F),
-                borderRadius: BorderRadius.circular(8)),
-            padding: const EdgeInsets.all(18),
+                borderRadius: BorderRadius.circular(12)),
+            padding: const EdgeInsets.all(16),
             child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                Expanded(
-                    child: _buildPanelStatNode(
-                        "AGE SPEC PB",
-                        "${stats.personalBest.toStringAsFixed(2)}m",
-                        const Color(0xFFACBC9A))),
-                Container(width: 1, height: 40, color: const Color(0xFF3E4246)),
-                Expanded(
-                    child: _buildPanelStatNode(
-                        "SESSION AVG",
-                        "${sessionAvg.toStringAsFixed(2)}m",
-                        const Color(0xFFEEE3D3))),
+                _buildPanelStatNode("TODAYS BEST",
+                    "${todaysBest.toStringAsFixed(2)}m", dynamicAccent),
+                _buildPanelStatNode(
+                    "SESSION AVG",
+                    "${sessionAvg.toStringAsFixed(2)}m",
+                    const Color(0xFFEEE3D3)),
+                _buildPanelStatNode(
+                    "LIFETIME PB", "${pb.toStringAsFixed(2)}m", dynamicAccent),
+                _buildPanelStatNode("SEASONS BEST", "${sb.toStringAsFixed(2)}m",
+                    const Color(0xFFEEE3D3)),
               ],
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           Container(
+            width: double.infinity,
             decoration: BoxDecoration(
                 color: const Color(0xFF1E221F),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xFF383C41))),
+                border: Border.all(color: dynamicAccent.withOpacity(0.3))),
             padding: const EdgeInsets.all(14),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -692,123 +673,144 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text("IMPLEMENT WEIGHT CAPTURE",
-                        style: TextStyle(
-                            fontSize: 10,
+                    Text(
+                        "${_currentActiveUser?.country.toUpperCase()} NATIONAL MERIT BENCHMARK",
+                        style: const TextStyle(
+                            fontSize: 9,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF909499))),
-                    const SizedBox(height: 2),
-                    Text(
-                        _customWeightOverrides[discipline] == null
-                            ? "Division Standard"
-                            : "Custom Override Running",
-                        style: const TextStyle(
-                            fontSize: 12, color: Color(0xFFACBC9A))),
-                  ],
-                ),
-                Row(
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.remove_circle_outline),
-                      onPressed: () => setState(() {
-                        double current =
-                            _customWeightOverrides[discipline] ?? standardW;
-                        _customWeightOverrides[discipline] =
-                            (current - (discipline == 'Javelin' ? 50 : 0.25))
-                                .clamp(0.1, 5000.0);
-                      }),
-                    ),
-                    Text(
-                        "${processingW.toStringAsFixed(1)}${discipline == 'Javelin' ? 'g' : 'kg'}",
-                        style: const TextStyle(
+                            color: Colors.grey)),
+                    const SizedBox(height: 4),
+                    Text("${meritStandard.toStringAsFixed(2)}m",
+                        style: TextStyle(
+                            fontSize: 16,
                             fontFamily: 'Courier',
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold)),
-                    IconButton(
-                      icon: const Icon(Icons.add_circle_outline),
-                      onPressed: () => setState(() {
-                        double current =
-                            _customWeightOverrides[discipline] ?? standardW;
-                        _customWeightOverrides[discipline] =
-                            current + (discipline == 'Javelin' ? 50 : 0.25);
-                      }),
-                    ),
-                    if (_customWeightOverrides[discipline] != null)
-                      IconButton(
-                        icon: const Icon(Icons.refresh,
-                            color: Colors.redAccent, size: 18),
-                        onPressed: () => setState(
-                            () => _customWeightOverrides[discipline] = null),
-                      ),
+                            fontWeight: FontWeight.bold,
+                            color: dynamicAccent)),
                   ],
                 ),
+                Text(
+                    "Standard: ${standardW.toStringAsFixed(1)}${discipline == 'Javelin' ? 'g' : 'kg'}",
+                    style:
+                        const TextStyle(fontSize: 11, color: Colors.white54)),
               ],
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           Container(
             decoration: BoxDecoration(
                 color: const Color(0xFF1E221F),
                 borderRadius: BorderRadius.circular(8)),
-            padding: const EdgeInsets.all(16),
-            child: Column(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            child: Row(
               children: [
-                TextField(
-                  controller: _distanceFieldController,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  style: const TextStyle(fontSize: 16, fontFamily: 'Courier'),
-                  decoration: const InputDecoration(
-                      filled: true,
-                      fillColor: Color(0xFF2C3530),
-                      labelText: 'Distance (meters)',
-                      labelStyle: TextStyle(fontSize: 13)),
-                ),
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  height: 44,
-                  child: ElevatedButton(
-                    onPressed: () async {
-                      double loggedDist =
-                          double.tryParse(_distanceFieldController.text) ?? 0.0;
-                      if (loggedDist > 0.0 && _currentActiveUser != null) {
-                        double proj = _calculateProjectedDistance(
-                            loggedDist, processingW, standardW);
-                        await DatabaseHelper.instance.insertThrow(
-                          userId: _currentActiveUser!.id,
-                          discipline: discipline,
-                          division: _selectedDivision,
-                          loggedDistance: loggedDist,
-                          activeWeight: processingW,
-                          projectedDistance: proj,
-                        );
-                        _distanceFieldController.clear();
-                        _loadSavedUserThrows();
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFACBC9A)),
-                    child: const Text("SAVE ENTRY",
+                const Expanded(
+                    child: Text("IMPLEMENT SELECTION OVERRIDE",
                         style: TextStyle(
+                            fontSize: 10,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF131516))),
+                            color: Colors.grey))),
+                IconButton(
+                  icon: const Icon(Icons.remove_circle_outline, size: 20),
+                  onPressed: () => setState(() {
+                    double current =
+                        _customWeightOverrides[discipline] ?? standardW;
+                    _customWeightOverrides[discipline] =
+                        (current - (discipline == 'Javelin' ? 50 : 0.25))
+                            .clamp(0.1, 5000.0);
+                  }),
+                ),
+                Text(
+                    "${processingW.toStringAsFixed(1)}${discipline == 'Javelin' ? 'g' : 'kg'}",
+                    style: const TextStyle(
+                        fontFamily: 'Courier',
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold)),
+                IconButton(
+                  icon: const Icon(Icons.add_circle_outline, size: 20),
+                  onPressed: () => setState(() {
+                    double current =
+                        _customWeightOverrides[discipline] ?? standardW;
+                    _customWeightOverrides[discipline] =
+                        current + (discipline == 'Javelin' ? 50 : 0.25);
+                  }),
+                ),
+// Re-positioned inward to provide safe screen bounds padding offsets
+                if (_customWeightOverrides[discipline] != null)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 6.0),
+                    child: InkWell(
+                      onTap: () => setState(
+                          () => _customWeightOverrides[discipline] = null),
+                      child: const Icon(Icons.refresh,
+                          color: Colors.redAccent, size: 20),
+                    ),
                   ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            decoration: BoxDecoration(
+                color: const Color(0xFF1E221F),
+                borderRadius: BorderRadius.circular(12)),
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _distanceFieldController,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    style: const TextStyle(fontSize: 15, fontFamily: 'Courier'),
+                    decoration: const InputDecoration(
+                        filled: true,
+                        fillColor: Color(0xFF2C3530),
+                        labelText: 'Distance (meters)',
+                        contentPadding:
+                            EdgeInsets.symmetric(horizontal: 12, vertical: 8)),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                ElevatedButton(
+                  onPressed: () async {
+                    double loggedDist =
+                        double.tryParse(_distanceFieldController.text) ?? 0.0;
+                    if (loggedDist > 0.0 && _currentActiveUser != null) {
+                      double proj = _calculateProjectedDistance(
+                          loggedDist, processingW, standardW);
+                      await DatabaseHelper.instance.insertThrow(
+                        userId: _currentActiveUser!.id,
+                        discipline: discipline,
+                        division: _selectedDivision,
+                        loggedDistance: loggedDist,
+                        activeWeight: processingW,
+                        projectedDistance: proj,
+                      );
+                      _distanceFieldController.clear();
+                      await _loadSavedUserThrows();
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                      backgroundColor: dynamicAccent,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 14)),
+                  child: const Icon(Icons.send,
+                      color: Color(0xFF131516), size: 18),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
           _buildThrowLogList(feed, discipline),
         ],
       ),
     );
   }
 
-  Widget _buildThrowLogList(List<ThrowEntry> feed, String discipline) {
+  Widget _buildThrowLogList(List feed, String discipline) {
     if (feed.isEmpty) return const SizedBox();
     return Container(
-      constraints: const BoxConstraints(maxHeight: 250),
+      constraints: const BoxConstraints(maxHeight: 200),
       decoration: BoxDecoration(
           color: const Color(0xFF1E221F),
           borderRadius: BorderRadius.circular(8)),
@@ -816,115 +818,23 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
         shrinkWrap: true,
         itemCount: feed.length,
         itemBuilder: (c, index) {
-          // Reversing retrieval calculation preserves chronological increments (Attempt #1 -> Attempt #N)
           final item = feed[feed.length - 1 - index];
           final int globalAttemptNumber = feed.length - index;
-          bool hasVariance = item.loggedDistance != item.projectedDistance;
           return ListTile(
+            dense: true,
             title: Text("Attempt #$globalAttemptNumber",
                 style:
-                    const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                    const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
             subtitle: Text(
                 "Weight: ${item.activeWeight.toStringAsFixed(1)}${discipline == 'Javelin' ? 'g' : 'kg'}",
-                style: const TextStyle(fontSize: 11)),
-            trailing: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text("${item.loggedDistance.toStringAsFixed(2)}m",
-                    style: const TextStyle(
-                        fontFamily: 'Courier',
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14)),
-                if (hasVariance)
-                  Text("Std: ${item.projectedDistance.toStringAsFixed(2)}m",
-                      style: const TextStyle(
-                          fontSize: 11, color: Color(0xFFACBC9A))),
-              ],
-            ),
+                style: const TextStyle(fontSize: 10)),
+            trailing: Text("${item.loggedDistance.toStringAsFixed(2)}m",
+                style: const TextStyle(
+                    fontFamily: 'Courier',
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13)),
           );
         },
-      ),
-    );
-  }
-
-  Widget _buildHistoricalView(String discipline) {
-    final data = _historicalData[discipline]!;
-    List<Map<String, dynamic>> recordsList = [
-      {"title": "Weekly Rolling Average", "val": data.weeklyAvg},
-      {"title": "Monthly Rolling Average", "val": data.monthlyAvg},
-      {"title": "Yearly Rolling Average", "val": data.yearlyAvg},
-    ];
-    return ListView.builder(
-      padding: const EdgeInsets.all(20),
-      itemCount: recordsList.length,
-      itemBuilder: (context, index) {
-        bool isExpanded = _expandedAccordionIndex[discipline] == index;
-        final row = recordsList[index];
-        return Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          decoration: BoxDecoration(
-              color: const Color(0xFF1E221F),
-              borderRadius: BorderRadius.circular(8)),
-          child: Column(
-            children: [
-              ListTile(
-                title: Text(row["title"] as String,
-                    style: const TextStyle(
-                        fontSize: 13, color: Color(0xFFEEE3D3))),
-                trailing: Text("${(row["val"] as double).toStringAsFixed(2)}m",
-                    style: const TextStyle(
-                        fontFamily: 'Courier',
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFFACBC9A))),
-                onTap: () => setState(() =>
-                    _expandedAccordionIndex[discipline] =
-                        isExpanded ? -1 : index),
-              ),
-              if (isExpanded) _buildAccordionGraphContent(),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildAccordionGraphContent() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      color: const Color(0xFF17191B),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text("HISTORICAL SCALING SNAPSHOT GRAPH",
-              style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey)),
-          const SizedBox(height: 14),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: List.generate(5, (barIndex) {
-              double heightFactor = [0.6, 0.75, 0.82, 0.9, 0.95][barIndex];
-              return Column(
-                children: [
-                  Container(
-                    height: 70 * heightFactor,
-                    width: 24,
-                    decoration: BoxDecoration(
-                        color: const Color(0xFFACBC9A)
-                            .withOpacity(0.4 + (barIndex * 0.12)),
-                        borderRadius: BorderRadius.circular(4)),
-                  ),
-                  const SizedBox(height: 6),
-                  Text("T-${5 - barIndex}",
-                      style: const TextStyle(fontSize: 9, color: Colors.grey)),
-                ],
-              );
-            }),
-          ),
-        ],
       ),
     );
   }
@@ -958,63 +868,38 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
               children: [
                 const Text("CREATE ATHLETE PROFILE",
                     style: TextStyle(
-                        fontSize: 18,
+                        fontSize: 16,
                         fontWeight: FontWeight.bold,
                         color: Color(0xFFEEE3D3),
                         fontFamily: 'Courier')),
-                const SizedBox(height: 6),
-                const Text("Setup multiple training accounts cleanly below.",
-                    style: TextStyle(fontSize: 12, color: Colors.grey)),
-                const SizedBox(height: 20),
+                const SizedBox(height: 16),
                 TextField(
                   controller: _onboardingNameController,
                   style: const TextStyle(fontFamily: 'Courier'),
                   decoration: const InputDecoration(
                       filled: true,
                       fillColor: Color(0xFF2C3530),
-                      labelText: "Username / Name",
-                      labelStyle: TextStyle(fontSize: 13)),
+                      labelText: "Username / Name"),
                 ),
                 const SizedBox(height: 16),
-                const Text("BIOLOGICAL SEX",
+                const Text("ATHLETIC NATION ORIGIN",
                     style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.bold,
                         color: Colors.grey)),
-                const SizedBox(height: 6),
-                Row(
-                  children: ["M", "W"].map((s) {
-                    bool active = _onboardingSelectedSex == s;
-                    return Expanded(
-                      child: GestureDetector(
-                        onTap: () => setState(() => _onboardingSelectedSex = s),
-                        child: Container(
-                          margin: const EdgeInsets.symmetric(horizontal: 4),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          decoration: BoxDecoration(
-                              color: active
-                                  ? const Color(0xFFACBC9A)
-                                  : const Color(0xFF2C3530),
-                              borderRadius: BorderRadius.circular(8)),
-                          alignment: Alignment.center,
-                          child: Text(s == "M" ? "Male" : "Female",
-                              style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: active
-                                      ? const Color(0xFF131516)
-                                      : Colors.white)),
-                        ),
-                      ),
-                    );
-                  }).toList(),
+                DropdownButton(
+                  value: _onboardingSelectedCountry,
+                  isExpanded: true,
+                  dropdownColor: const Color(0xFF1E221F),
+                  style: const TextStyle(
+                      color: Color(0xFFACBC9A), fontWeight: FontWeight.bold),
+                  onChanged: (v) =>
+                      setState(() => _onboardingSelectedCountry = v!),
+                  items: _countriesList
+                      .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                      .toList(),
                 ),
                 const SizedBox(height: 16),
-                const Text("AGE MASTER MATRIX GROUP",
-                    style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey)),
-                const SizedBox(height: 6),
                 DropdownButton(
                   value: _onboardingSelectedAge,
                   isExpanded: true,
@@ -1025,12 +910,7 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
                       setState(() => _onboardingSelectedAge = v as String),
                   items: ages
                       .map((a) => DropdownMenuItem(
-                          value: a,
-                          child: Text(a == 'Sch'
-                              ? "School Bracket"
-                              : a == 'Sen'
-                                  ? "Senior Bracket"
-                                  : "Masters $a+")))
+                          value: a, child: Text("Age Group: $a")))
                       .toList(),
                 ),
                 const SizedBox(height: 24),
@@ -1049,7 +929,7 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
                             _onboardingSelectedAge);
                         await db.setActiveProfile(id);
                         _onboardingNameController.clear();
-                        _initializeAppDatabaseAndProfiles();
+                        await _initializeAppDatabaseAndProfiles();
                       }
                     },
                     child: const Text("INITIALIZE ACCOUNT",
@@ -1071,15 +951,14 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
       children: [
         Text(label,
             style: const TextStyle(
-                fontSize: 10,
+                fontSize: 9,
                 color: Color(0xFF909499),
-                fontWeight: FontWeight.w600,
-                letterSpacing: 1)),
-        const SizedBox(height: 6),
+                fontWeight: FontWeight.bold)),
+        const SizedBox(height: 4),
         Text(value,
             style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w400,
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
                 fontFamily: 'Courier',
                 color: textAccent)),
       ],
