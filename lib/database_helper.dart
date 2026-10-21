@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 
@@ -8,7 +9,9 @@ class DatabaseHelper {
   DatabaseHelper._init();
 
   Future<Database> get database async {
-    if (_database != null) return _database!;
+    if (_database != null) {
+      return _database!;
+    }
     _database = await _initDB('throws_tracker.db');
     return _database!;
   }
@@ -19,8 +22,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version:
-          2, // Upgraded database version layer to safely trigger migrations
+      version: 2,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -52,15 +54,13 @@ class DatabaseHelper {
     ''');
   }
 
-  // 🔹 Self-Healing Migration Routine: Preserves existing local athlete data while applying new columns
   Future _upgradeDB(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 2) {
       try {
         await db.execute(
             "ALTER TABLE user_profile ADD COLUMN country TEXT NOT NULL DEFAULT 'United Kingdom (UK)'");
       } catch (e) {
-        // Guard checking if the column already exists in some developer environment iterations
-        print("Database migration column safety bypass: $e");
+        debugPrint("Database migration column safety bypass: $e");
       }
     }
   }
