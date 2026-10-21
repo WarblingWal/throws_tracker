@@ -660,6 +660,22 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
     );
   }
 
+  Widget _buildHistoryCounterNode(String subtitle, int count) {
+    return Column(
+      children: [
+        Text("$count",
+            style: const TextStyle(
+                fontSize: 22,
+                fontFamily: 'Courier',
+                fontWeight: FontWeight.bold)),
+        const SizedBox(height: 4),
+        Text(subtitle,
+            style: const TextStyle(
+                fontSize: 9, color: Colors.grey, fontWeight: FontWeight.bold)),
+      ],
+    );
+  }
+
   Widget _buildDisciplineLayout(String discipline, Color dynamicAccent) {
     return DefaultTabController(
       length: 2,
