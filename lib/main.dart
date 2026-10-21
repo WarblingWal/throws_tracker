@@ -152,48 +152,54 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
   int _yearsCount = 0;
   int _pbsThisYearCount = 0;
   Future<void> _initializeAppDatabaseAndProfiles() async {
-    final db = DatabaseHelper.instance;
-    final profileMaps = await db.getAllProfiles();
+    try {
+      final db = DatabaseHelper.instance;
+      final profileMaps = await db.getAllProfiles();
 
-    List<UserProfile> loadedProfiles = profileMaps
-        .map((m) => UserProfile(
-              id: m['id'] as int,
-              username: m['username'] as String,
-              sex: m['sex'] as String,
-              ageGroup: m['ageGroup'] as String,
-              country: m.containsKey('country')
-                  ? (m['country'] as String? ?? 'United Kingdom (UK)')
+      List<UserProfile> loadedProfiles = profileMaps
+          .map((m) => UserProfile(
+                id: m['id'] as int,
+                username: m['username'] as String,
+                sex: m['sex'] as String,
+                ageGroup: m['ageGroup'] as String,
+                country: m.containsKey('country') && m['country'] != null
+                    ? (m['country'] as String)
+                    : 'United Kingdom (UK)',
+              ))
+          .toList();
+
+      Map<String, dynamic>? activeMap = await db.getActiveProfile();
+      UserProfile? activeUser;
+
+      if (activeMap != null) {
+        activeUser = UserProfile(
+          id: activeMap['id'] as int,
+          username: activeMap['username'] as String,
+          sex: activeMap['sex'] as String,
+          ageGroup: activeMap['ageGroup'] as String,
+          country:
+              activeMap.containsKey('country') && activeMap['country'] != null
+                  ? (activeMap['country'] as String)
                   : 'United Kingdom (UK)',
-            ))
-        .toList();
-
-    Map<String, dynamic>? activeMap = await db.getActiveProfile();
-    UserProfile? activeUser;
-
-    if (activeMap != null) {
-      activeUser = UserProfile(
-        id: activeMap['id'] as int,
-        username: activeMap['username'] as String,
-        sex: activeMap['sex'] as String,
-        ageGroup: activeMap['ageGroup'] as String,
-        country: activeMap.containsKey('country')
-            ? (activeMap['country'] as String? ?? 'United Kingdom (UK)')
-            : 'United Kingdom (UK)',
-      );
-    }
-
-    setState(() {
-      _allProfiles = loadedProfiles;
-      _currentActiveUser = activeUser;
-      if (_currentActiveUser != null) {
-        _selectedDivision =
-            "${_currentActiveUser!.sex}${_currentActiveUser!.ageGroup}";
+        );
       }
-      _isLoading = false;
-    });
 
-    if (_currentActiveUser != null) {
-      await _loadSavedUserThrows();
+      setState(() {
+        _allProfiles = loadedProfiles;
+        _currentActiveUser = activeUser;
+        if (_currentActiveUser != null) {
+          _selectedDivision =
+              "${_currentActiveUser!.sex}${_currentActiveUser!.ageGroup}";
+        }
+        _isLoading = false;
+      });
+
+      if (_currentActiveUser != null) {
+        await _loadSavedUserThrows();
+      }
+    } catch (e) {
+      debugPrint("Safety boot check bypassed unhandled migration errors: $e");
+      setState(() => _isLoading = false);
     }
   }
 
@@ -703,7 +709,7 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
             child: TabBarView(
               children: [
                 _buildCurrentSessionView(discipline, dynamicAccent),
-                const Center(child: Text("Analytics Section")),
+                _buildHistoricalChartsView(discipline, dynamicAccent),
               ],
             ),
           ),
@@ -929,6 +935,67 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
     );
   }
 
+  Widget _buildHistoricalChartsView(String discipline, Color dynamicAccent) {
+    final feed = _sessionLogs[discipline] ?? [];
+    double meritStandard = _getCountryMeritStandard(
+        _currentActiveUser?.country ?? 'UK', discipline, _selectedDivision);
+    if (feed.isEmpty) {
+      return const Center(
+          child: Text("Log data points first to generate performance trends.",
+              style: TextStyle(color: Colors.white54, fontSize: 12)));
+    }
+    return PageStorage(
+      bucket: PageStorageBucket(),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text("CHRONOLOGICAL PERFORMANCE TREND LINE",
+                style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: dynamicAccent,
+                    letterSpacing: 1.2)),
+            const SizedBox(height: 12),
+            Container(
+              height: 220,
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                  color: const Color(0xFF1E221F),
+                  borderRadius: BorderRadius.circular(12)),
+              child: CustomPaint(
+                painter: TrainingLineChartPainter(
+                    entries: feed,
+                    targetMerit: meritStandard,
+                    accentColor: dynamicAccent),
+              ),
+            ),
+            const SizedBox(height: 14),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(children: [
+                  Container(width: 10, height: 10, color: dynamicAccent),
+                  const SizedBox(width: 6),
+                  const Text("Logged Distance",
+                      style: TextStyle(fontSize: 11, color: Colors.grey))
+                ]),
+                Row(children: [
+                  Container(width: 10, height: 2, color: Colors.white24),
+                  const SizedBox(width: 6),
+                  const Text("National Merit Threshold",
+                      style: TextStyle(fontSize: 11, color: Colors.grey))
+                ]),
+              ],
+            )
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildOnboardingScreen() {
     List ages = [
       'Sch',
@@ -1055,4 +1122,62 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
       ],
     );
   }
+}
+
+class TrainingLineChartPainter extends CustomPainter {
+  final List entries;
+  final double targetMerit;
+  final Color accentColor;
+  TrainingLineChartPainter(
+      {required this.entries,
+      required this.targetMerit,
+      required this.accentColor});
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (entries.isEmpty) return;
+    final paintLine = Paint()
+      ..color = accentColor
+      ..strokeWidth = 3.0
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+    final paintDot = Paint()
+      ..color = accentColor
+      ..style = PaintingStyle.fill;
+    final paintMerit = Paint()
+      ..color = Colors.white24
+      ..strokeWidth = 1.5
+      ..style = PaintingStyle.stroke;
+    final textPaint = TextPainter(textDirection: TextDirection.ltr);
+    double maxDistance = entries.map((e) => e.loggedDistance).reduce(math.max);
+    maxDistance = math.max(maxDistance, targetMerit) * 1.15;
+    double minDistance = entries.map((e) => e.loggedDistance).reduce(math.min);
+    minDistance = math.max(0.0, minDistance - 5.0);
+    double range = maxDistance - minDistance;
+    if (range <= 0) range = 1.0;
+    double meritY =
+        size.height - (((targetMerit - minDistance) / range) * size.height);
+    canvas.drawLine(Offset(0, meritY), Offset(size.width, meritY), paintMerit);
+    textPaint.text = TextSpan(
+        text: "Merit: ${targetMerit.toStringAsFixed(1)}m",
+        style: const TextStyle(color: Colors.white30, fontSize: 8));
+    textPaint.layout();
+    textPaint.paint(canvas, Offset(4, meritY - 12));
+    double widthSlice = size.width / math.max(1, entries.length - 1);
+    List points = [];
+    for (int i = 0; i < entries.length; i++) {
+      double x = i * widthSlice;
+      double y = size.height -
+          (((entries[i].loggedDistance - minDistance) / range) * size.height);
+      points.add(Offset(x, y));
+      canvas.drawCircle(Offset(x, y), 4.0, paintDot);
+    }
+    if (points.length > 1) {
+      for (int i = 0; i < points.length - 1; i++) {
+        canvas.drawLine(points[i], points[i + 1], paintLine);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
