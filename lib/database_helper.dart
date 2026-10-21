@@ -19,8 +19,10 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 1,
+      version:
+          2, // Upgraded database version layer to safely trigger migrations
       onCreate: _createDB,
+      onUpgrade: _upgradeDB,
     );
   }
 
@@ -31,6 +33,7 @@ class DatabaseHelper {
         username TEXT NOT NULL UNIQUE,
         sex TEXT NOT NULL,
         ageGroup TEXT NOT NULL,
+        country TEXT NOT NULL DEFAULT 'United Kingdom (UK)',
         isActive INTEGER NOT NULL DEFAULT 0
       )
     ''');
@@ -49,13 +52,27 @@ class DatabaseHelper {
     ''');
   }
 
-  Future<int> createProfile(
-      String username, String sex, String ageGroup) async {
+  // 🔹 Self-Healing Migration Routine: Preserves existing local athlete data while applying new columns
+  Future _upgradeDB(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      try {
+        await db.execute(
+            "ALTER TABLE user_profile ADD COLUMN country TEXT NOT NULL DEFAULT 'United Kingdom (UK)'");
+      } catch (e) {
+        // Guard checking if the column already exists in some developer environment iterations
+        print("Database migration column safety bypass: $e");
+      }
+    }
+  }
+
+  Future<int> createProfile(String username, String sex, String ageGroup,
+      {String country = 'United Kingdom (UK)'}) async {
     final db = await instance.database;
     final profileData = {
       'username': username,
       'sex': sex,
       'ageGroup': ageGroup,
+      'country': country,
       'isActive': 0,
     };
     return await db.insert('user_profile', profileData);
