@@ -1,4 +1,4 @@
-﻿<manifest xmlns:android="http://android.com"
+<manifest xmlns:android="http://android.com"
     package="com.example.throws_tracker">
 
     <uses-permission android:name="android.permission.INTERNET" />
