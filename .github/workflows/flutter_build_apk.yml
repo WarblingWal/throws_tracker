@@ -16,21 +16,28 @@ jobs:
     steps:
       - name: Check out repository source code
         uses: actions/checkout@v4
+        with:
+          # 🔹 Forces a fresh, deep fetch of the absolute latest commit tree
+          fetch-depth: 0 
 
       - name: Initialise Java Environment Matrix
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: '17'
+          # 🔹 Forces GitHub to clear and reconstruct its internal build cache records
+          cache: 'gradle'
 
       - name: Initialise Stable Flutter SDK Framework
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
+          cache: true
+          # 🔹 Custom key token to permanently break old container images
+          cache-key: "flutter-cache-key-v2"
 
       - name: Fetch Manifest Remote Dependencies
         run: flutter pub get
 
       - name: Compile Production Release Binary
-        # 🔹 Added flag to skip dependency validation checks and force the build to compile
         run: flutter build apk --release --no-tree-shake-icons --android-skip-build-dependency-validation
