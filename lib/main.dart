@@ -133,7 +133,6 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
   final TextEditingController _onboardingNameController =
       TextEditingController();
 
-  // Metrics Dashboard Variables calculated via aggregate filters
   final Map<String, double> _lifetimePBs = {
     'Discus': 0.0,
     'Shot Put': 0.0,
@@ -149,7 +148,6 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
     'Weight': 0.0
   };
 
-  // Macro Workout History Metrics variables
   String _lastSessionDisplay = "No Workouts Recorded";
   int _weeksCount = 0;
   int _monthsCount = 0;
@@ -259,20 +257,15 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
 
       for (var t in throws) {
         DateTime tDate = DateTime.tryParse(t.timestamp) ?? DateTime.now();
-
-        // Track unique active session limits
         if (maxTimestamp == null || tDate.isAfter(maxTimestamp)) {
           maxTimestamp = tDate;
         }
 
         if (t.loggedDistance > maxAllTime) maxAllTime = t.loggedDistance;
-
-        // Match Calendar Year boundaries starting in January
         if (tDate.year == currentYear) {
           if (t.loggedDistance > maxSeason) maxSeason = t.loggedDistance;
         }
 
-        // Aggregate frequency stats
         if (tDate.isAfter(weekAgo)) weeklyCounter++;
         if (tDate.isAfter(monthAgo)) monthlyCounter++;
         if (tDate.isAfter(yearAgo)) yearlyCounter++;
@@ -280,12 +273,9 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
 
       _lifetimePBs[d] = maxAllTime;
       _seasonsBests[d] = maxSeason;
-
-      // Rough estimation of recent incremental milestones
       if (maxSeason > 0.0 && maxSeason >= maxAllTime) pbCounter++;
     }
 
-    // Isolate active layout elements
     if (maxTimestamp != null) {
       String dateStr =
           "${maxTimestamp.day.toString().padLeft(2, '0')}/${maxTimestamp.month.toString().padLeft(2, '0')}/${maxTimestamp.year}";
@@ -342,7 +332,7 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
     if (country.contains('United Kingdom') || country.contains('UK')) {
       if (isM55 && isMale) {
         if (discipline == 'Discus')
-          return 29.10; // Official British BMAF M55 Merit Standard
+          return 29.10; // Official British BMAF M55 Merit Standard [1.21]
         if (discipline == 'Shot Put') return 9.20;
         if (discipline == 'Javelin') return 29.50;
         if (discipline == 'Hammer') return 30.20;
@@ -353,6 +343,14 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
     return 20.00;
   }
 
+  IconData _getDisciplineIcon(String discipline) {
+    if (discipline == 'Discus') return Icons.album;
+    if (discipline == 'Shot Put') return Icons.radio_button_checked;
+    if (discipline == 'Javelin') return Icons.navigation;
+    if (discipline == 'Hammer') return Icons.gavel;
+    return Icons.ads_click;
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading)
@@ -361,7 +359,6 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
               child: CircularProgressIndicator(color: Color(0xFFACBC9A))));
     if (_currentActiveUser == null) return _buildOnboardingScreen();
 
-    // Map context colors based on active tabs selection
     final Color currentCanvasColor = _activeMenuIndex == 0
         ? const Color(0xFF2C3530)
         : _disciplineBackgrounds[_disciplines[_activeMenuIndex - 1]]!;
@@ -444,7 +441,6 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
           GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            // Slightly shorter vertically via proportional grid overrides (1.35 aspect factor)
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 2,
                 crossAxisSpacing: 12,
@@ -734,7 +730,6 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
                         current + (discipline == 'Javelin' ? 50 : 0.25);
                   }),
                 ),
-// Re-positioned inward to provide safe screen bounds padding offsets
                 if (_customWeightOverrides[discipline] != null)
                   Padding(
                     padding: const EdgeInsets.only(left: 6.0),
@@ -923,10 +918,12 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
                     onPressed: () async {
                       if (_onboardingNameController.text.trim().isNotEmpty) {
                         final db = DatabaseHelper.instance;
+// Forward country dropdown selection straight down into database schema column v2
                         int id = await db.createProfile(
                             _onboardingNameController.text.trim(),
                             _onboardingSelectedSex,
-                            _onboardingSelectedAge);
+                            _onboardingSelectedAge,
+                            country: _onboardingSelectedCountry);
                         await db.setActiveProfile(id);
                         _onboardingNameController.clear();
                         await _initializeAppDatabaseAndProfiles();
