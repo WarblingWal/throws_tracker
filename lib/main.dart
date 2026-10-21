@@ -76,6 +76,8 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
   int _onboardingCountryIdx = 0;
   int _onboardingAgeIdx = 3;
 
+  String _activeTimeFilter = "All Time";
+
   final List<String> _countriesList = [
     'United Kingdom (UK)',
     'United States (US)',
@@ -127,21 +129,21 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
     'Weight': null
   };
 
-  // 🎨 Graded variations of Nordic Moss Green, Alpine Forest Timber Spruce, Sage, and Organic Clay
+  // 🎨 Distinct Graded Shades of Premium Scandinavian Moss, Sage, Forest, and Spruce
   final Map<String, Color> _disciplineBackgrounds = {
-    'Discus': const Color(0xFF2C3530), // Deep Moss Green
-    'Shot Put': const Color(0xFF333B36), // Muted Pale Sage Grey-Green
-    'Javelin': const Color(0xFF3A443F), // Soft Clay Nordic Green
-    'Hammer': const Color(0xFF242B26), // Earth Dark Spruce Green
-    'Weight': const Color(0xFF1E2623), // Alpine Deep Timber Spruce
+    'Discus': const Color(0xFF2C3530), // Moss Spruce Shading
+    'Shot Put': const Color(0xFF333B36), // Deep Muted Sage
+    'Javelin': const Color(0xFF3A443F), // Soft Slate Forest
+    'Hammer': const Color(0xFF242B26), // Dense Alpine Timber
+    'Weight': const Color(0xFF1E2623), // Glacial Spruce Green
   };
 
   final Map<String, Color> _disciplineAccents = {
-    'Discus': const Color(0xFFACBC9A), // Scandinavian Light Moss Highlight
-    'Shot Put': const Color(0xFFC2D3B4), // Soft Sage Accent
-    'Javelin': const Color(0xFFD2E0BF), // Pale Clay Lime Green Accent
-    'Hammer': const Color(0xFF9EB086), // Frost Forest Green Accent
-    'Weight': const Color(0xFF8FA89B), // Pure Glacial Spruce Highlight
+    'Discus': const Color(0xFFACBC9A), // Nordic Moss Highlights
+    'Shot Put': const Color(0xFFC2D3B4), // Premium Pale Sage
+    'Javelin': const Color(0xFFD2E0BF), // Frost Birch Green
+    'Hammer': const Color(0xFF9EB086), // Woodland Leaf Accent
+    'Weight': const Color(0xFF8FA89B), // Ice Spruce Highlight
   };
 
   final TextEditingController _distanceFieldController =
@@ -174,6 +176,9 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
   @override
   void initState() {
     super.initState();
+    _distanceFieldController.addListener(() {
+      setState(() {});
+    });
     _initializeAppDatabaseAndProfiles();
   }
 
@@ -182,6 +187,29 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
     _distanceFieldController.dispose();
     _onboardingNameController.dispose();
     super.dispose();
+  }
+
+  // 📐 Core Mathematical Operations
+  double _calculateProjectedDistance(
+      double distance, double actualW, double standardW) {
+    if (actualW == standardW || actualW <= 0) return distance;
+    return distance * (actualW / standardW);
+  }
+
+  double _getStandardWeight(String discipline, String division) {
+    bool isMale = division.startsWith('M');
+    if (division.contains('55') || division.contains('50')) {
+      if (discipline == 'Discus') return isMale ? 1.5 : 1.0;
+      if (discipline == 'Shot Put') return isMale ? 6.0 : 3.0;
+      if (discipline == 'Javelin') return isMale ? 700.0 : 500.0;
+      if (discipline == 'Hammer') return isMale ? 6.0 : 3.0;
+      return isMale ? 11.34 : 7.26;
+    }
+    if (discipline == 'Discus') return isMale ? 2.0 : 1.0;
+    if (discipline == 'Shot Put') return isMale ? 7.26 : 4.0;
+    if (discipline == 'Javelin') return isMale ? 800.0 : 600.0;
+    if (discipline == 'Hammer') return isMale ? 7.26 : 4.0;
+    return isMale ? 15.88 : 9.08;
   }
 
   Future<void> _initializeAppDatabaseAndProfiles() async {
@@ -231,7 +259,7 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
         await _loadSavedUserThrows();
       }
     } catch (e) {
-      debugPrint("Safety boot check bypassed unhandled migration errors: $e");
+      debugPrint("Safety database link check bypassed: $e");
       setState(() => _isLoading = false);
     }
   }
@@ -324,35 +352,12 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
       }
       _lastSessionDisplay = "$dateStr (${lastSessionDisciplines.join(', ')})";
     }
-
     setState(() {
       _weeksCount = weeklyCounter;
       _monthsCount = monthlyCounter;
       _yearsCount = yearlyCounter;
       _pbsThisYearCount = pbCounter;
     });
-  }
-
-  double _getStandardWeight(String discipline, String division) {
-    bool isMale = division.startsWith('M');
-    if (division.contains('55') || division.contains('50')) {
-      if (discipline == 'Discus') return isMale ? 1.5 : 1.0;
-      if (discipline == 'Shot Put') return isMale ? 6.0 : 3.0;
-      if (discipline == 'Javelin') return isMale ? 700.0 : 500.0;
-      if (discipline == 'Hammer') return isMale ? 6.0 : 3.0;
-      return isMale ? 11.34 : 7.26;
-    }
-    if (discipline == 'Discus') return isMale ? 2.0 : 1.0;
-    if (discipline == 'Shot Put') return isMale ? 7.26 : 4.0;
-    if (discipline == 'Javelin') return isMale ? 800.0 : 600.0;
-    if (discipline == 'Hammer') return isMale ? 7.26 : 4.0;
-    return isMale ? 15.88 : 9.08;
-  }
-
-  double _calculateProjectedDistance(
-      double distance, double actualW, double standardW) {
-    if (actualW == standardW || actualW <= 0) return distance;
-    return distance * (actualW / standardW);
   }
 
   double _getCountryMeritStandard(
@@ -378,6 +383,45 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
     if (discipline == 'Javelin') return Icons.navigation;
     if (discipline == 'Hammer') return Icons.gavel;
     return Icons.ads_click;
+  }
+
+  List _filterDataPointsByTimeWindow(List rawLogs) {
+    if (rawLogs.isEmpty) return [];
+    final DateTime targetBaselineNow = DateTime.now();
+    if (_activeTimeFilter == "Last Session") {
+      if (rawLogs.isEmpty) return [];
+      final DateTime absoluteLastDate =
+          DateTime.tryParse(rawLogs.last.timestamp) ?? targetBaselineNow;
+      return rawLogs.where((t) {
+        final DateTime tDate =
+            DateTime.tryParse(t.timestamp) ?? targetBaselineNow;
+        return tDate.day == absoluteLastDate.day &&
+            tDate.month == absoluteLastDate.month &&
+            tDate.year == absoluteLastDate.year;
+      }).toList();
+    }
+    if (_activeTimeFilter == "Last Week") {
+      final limit = targetBaselineNow.subtract(const Duration(days: 7));
+      return rawLogs
+          .where((t) => (DateTime.tryParse(t.timestamp) ?? targetBaselineNow)
+              .isAfter(limit))
+          .toList();
+    }
+    if (_activeTimeFilter == "Last Month") {
+      final limit = targetBaselineNow.subtract(const Duration(days: 30));
+      return rawLogs
+          .where((t) => (DateTime.tryParse(t.timestamp) ?? targetBaselineNow)
+              .isAfter(limit))
+          .toList();
+    }
+    if (_activeTimeFilter == "Last Year") {
+      final limit = targetBaselineNow.subtract(const Duration(days: 365));
+      return rawLogs
+          .where((t) => (DateTime.tryParse(t.timestamp) ?? targetBaselineNow)
+              .isAfter(limit))
+          .toList();
+    }
+    return rawLogs;
   }
 
   @override
@@ -412,7 +456,6 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
                 letterSpacing: 2.5)),
         actions: [
           PopupMenuButton(
-// 🔹 Fixed: Stripped out the legacy undefined 'onShadowChange' parameter handle
             onSelected: (value) async {
               if (value == 'NEW_USER_ACTION') {
                 await DatabaseHelper.instance.clearActiveProfile();
@@ -948,7 +991,6 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
               ],
             ),
           ),
-// 🔹 Fixed: Swapped target literal 'Center' out for strict alignment enum variant 'TextAlign.center'
           if (processingW != standardW &&
               _distanceFieldController.text.isNotEmpty) ...[
             const SizedBox(height: 10),
@@ -1026,62 +1068,160 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
   }
 
   Widget _buildHistoricalChartsView(String discipline, Color dynamicAccent) {
-    final feed = _sessionLogs[discipline] ?? [];
+    final rawFeed = _sessionLogs[discipline] ?? [];
+    final filteredFeed = _filterDataPointsByTimeWindow(rawFeed);
     double meritStandard = _getCountryMeritStandard(
         _currentActiveUser?.country ?? 'UK', discipline, _selectedDivision);
-    if (feed.isEmpty) {
-      return const Center(
-          child: Text("Log data points first to generate performance trends.",
-              style: TextStyle(color: Colors.white54, fontSize: 12)));
+    final List filterWindows = [
+      "All Time",
+      "Last Session",
+      "Last Week",
+      "Last Month",
+      "Last Year"
+    ];
+    double windowMax = 0.0;
+    double windowAvg = 0.0;
+// 🔹 Fixed: Replaced the un-inferred .reduce() array operator with a simple, standard loop to pull high metrics cleanly
+    if (filteredFeed.isNotEmpty) {
+      windowMax = filteredFeed.first.loggedDistance;
+      double totalSum = 0.0;
+      for (var entry in filteredFeed) {
+        if (entry.loggedDistance > windowMax) {
+          windowMax = entry.loggedDistance;
+        }
+        totalSum += entry.loggedDistance;
+      }
+      windowAvg = totalSum / filteredFeed.length;
     }
-    return PageStorage(
-      bucket: PageStorageBucket(),
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text("CHRONOLOGICAL PERFORMANCE TREND LINE",
-                style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                    color: dynamicAccent,
-                    letterSpacing: 1.2)),
-            const SizedBox(height: 12),
-            Container(
-              height: 220,
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                  color: const Color(0xFF1E221F),
-                  borderRadius: BorderRadius.circular(12)),
-              child: CustomPaint(
-                painter: TrainingLineChartPainter(
-                    entries: feed,
-                    targetMerit: meritStandard,
-                    accentColor: dynamicAccent),
-              ),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: filterWindows.map((windowName) {
+                bool isSelected = _activeTimeFilter == windowName;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 6.0),
+                  child: ChoiceChip(
+                    label: Text(windowName,
+                        style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: isSelected ? Colors.black : Colors.white70)),
+                    selected: isSelected,
+                    selectedColor: dynamicAccent,
+                    backgroundColor: const Color(0xFF1E221F),
+                    onSelected: (bool selected) {
+                      if (selected) {
+                        setState(() => _activeTimeFilter = windowName);
+                      }
+                    },
+                  ),
+                );
+              }).toList(),
             ),
-            const SizedBox(height: 14),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(children: [
-                  Container(width: 10, height: 10, color: dynamicAccent),
-                  const SizedBox(width: 6),
-                  const Text("Logged Distance",
-                      style: TextStyle(fontSize: 11, color: Colors.grey))
-                ]),
-                Row(children: [
-                  Container(width: 10, height: 2, color: Colors.white24),
-                  const SizedBox(width: 6),
-                  const Text("National Merit Threshold",
-                      style: TextStyle(fontSize: 11, color: Colors.grey))
-                ]),
-              ],
-            )
-          ],
-        ),
+          ),
+          const SizedBox(height: 16),
+          Text("${_activeTimeFilter.toUpperCase()} TREND GRAPH LINE",
+              style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: dynamicAccent,
+                  letterSpacing: 1.2)),
+          const SizedBox(height: 12),
+          Container(
+            height: 220,
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+                color: const Color(0xFF1E221F),
+                borderRadius: BorderRadius.circular(12)),
+            child: filteredFeed.isEmpty
+                ? const Center(
+                    child: Text(
+                        "No records caught inside this date frame window.",
+                        style: TextStyle(fontSize: 11, color: Colors.grey)))
+                : CustomPaint(
+                    painter: TrainingLineChartPainter(
+                        entries: filteredFeed,
+                        targetMerit: meritStandard,
+                        accentColor: dynamicAccent),
+                  ),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(children: [
+                Container(width: 10, height: 10, color: dynamicAccent),
+                const SizedBox(width: 6),
+                const Text("Logged Distance",
+                    style: TextStyle(fontSize: 11, color: Colors.grey))
+              ]),
+              Row(children: [
+                Container(width: 10, height: 2, color: Colors.white24),
+                const SizedBox(width: 6),
+                const Text("National Merit Threshold",
+                    style: TextStyle(fontSize: 11, color: Colors.grey))
+              ]),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Text("${_activeTimeFilter.toUpperCase()} CALCULATIONS GRID",
+              style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: dynamicAccent,
+                  letterSpacing: 1.2)),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                  child: _buildTimelineStatMiniCard("WINDOW PEAK",
+                      "${windowMax.toStringAsFixed(2)}m", dynamicAccent)),
+              const SizedBox(width: 10),
+              Expanded(
+                  child: _buildTimelineStatMiniCard(
+                      "WINDOW AVERAGE",
+                      "${windowAvg.toStringAsFixed(2)}m",
+                      const Color(0xFFEEE3D3))),
+              const SizedBox(width: 10),
+              Expanded(
+                  child: _buildTimelineStatMiniCard(
+                      "TOTAL THROWS", "${filteredFeed.length}", dynamicAccent)),
+            ],
+          )
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTimelineStatMiniCard(
+      String label, String value, Color textAccent) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+          color: const Color(0xFF1E221F),
+          borderRadius: BorderRadius.circular(8)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label,
+              style: const TextStyle(
+                  fontSize: 8,
+                  color: Colors.grey,
+                  fontWeight: FontWeight.bold)),
+          const SizedBox(height: 4),
+          Text(value,
+              style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'Courier',
+                  color: textAccent)),
+        ],
       ),
     );
   }
@@ -1138,7 +1278,6 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
   }
 
   Widget _buildOnboardingScreen() {
-// 🔹 Fixed: Stripped out legacy unused local variables to satisfy strict Dart analysis flags
     return Scaffold(
       body: Center(
         child: SingleChildScrollView(
