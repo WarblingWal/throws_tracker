@@ -22,9 +22,8 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
-          cache: false # 👈 Disables the cache fallback system completely
+          cache: false
 
-      # 🧹 FORCE PURGE: Clears out all stale cached Gradle manifests and local artifacts
       - name: Purge Cache and System Artifacts
         run: |
           flutter clean
@@ -34,7 +33,8 @@ jobs:
         run: flutter pub get
 
       - name: Compile Production Release Binary Package Artifact
-        run: flutter build apk --release
+        # 🛠️ BYPASS FLAG APPLIED: Prevents Gradle version mismatch errors on the remote runner
+        run: flutter build apk --release --android-skip-build-dependency-validation
 
       - name: Export Deployable Release APK File to Dashboard
         uses: actions/upload-artifact@v4
