@@ -47,7 +47,7 @@ jobs:
                       
                       <meta-data
                           android:name="io.flutter.embedding.android.NormalTheme"
-                          android:resource="@style/NormalTheme" />
+                          **android:resource="@style/NormalTheme"** />
                         
                       <intent-filter>
                           <action android:name="android.intent.action.MAIN"/>
@@ -69,7 +69,7 @@ jobs:
           </manifest>
           EOF
 
-      - name: Patch Gradle Environment Properties for AGP 9 Compatibility
+      - name: Patch Gradle Properties for AGP 9 Backward Compatibility
         run: |
           mkdir -p android
           touch android/gradle.properties
@@ -78,10 +78,16 @@ jobs:
       - name: Synchronize Package Dependencies
         run: flutter pub get
 
-      - name: Hard Upgrade Local Gradle Wrapper to Supported Build Target
+      - name: Self-Heal and Generate Missing Gradle Wrapper Files
         run: |
           cd android
-          ./gradlew :wrapper --gradle-version 8.14.0 --distribution-type bin
+          if [ ! -f gradlew ]; then
+            echo "⚠️ gradlew file was missing from repository source. Initialising wrapper binaries..."
+            gradle wrapper --gradle-version 8.14.0 --distribution-type bin
+          else
+            ./gradlew :wrapper --gradle-version 8.14.0 --distribution-type bin
+          fi
+          chmod +x gradlew
 
       - name: Compile Production Release Binary Package Artifact
         run: flutter build apk --release --android-skip-build-dependency-validation --no-tree-shake-icons
