@@ -22,13 +22,69 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
-          cache: false # 👈 CRITICAL FIX: Disables the cache fallback system completely
+          cache: false
+
+      - name: Hard Overwrite Faulty Android Manifest
+        run: |
+          cat << 'EOF' > android/app/src/main/AndroidManifest.xml
+          <manifest xmlns:android="http://android.com"
+              package="com.example.throws_tracker">
+
+              <uses-permission android:name="android.permission.INTERNET" />
+
+              <application
+                  android:label="Throws Hub Force"
+                  android:icon="@mipmap/ic_launcher">
+                  
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true"
+                      android:launchMode="singleTop"
+                      android:theme="@style/LaunchTheme"
+                      android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+                      android:hardwareAccelerated="true"
+                      android:windowSoftInputMode="adjustResize">
+                      
+                      <meta-data
+                          android:name="io.flutter.embedding.android.NormalTheme"
+                          android:resource="@style/NormalTheme" />
+                        
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN"/>
+                          <category android:name="android.intent.category.LAUNCHER"/>
+                      </intent-filter>
+                  </activity>
+                  
+                  <meta-data
+                      android:name="flutterEmbedding"
+                      android:value="2" />
+              </application>
+
+              <queries>
+                  <intent>
+                      <action android:name="android.intent.action.PROCESS_TEXT"/>
+                      <data android:mimeType="text/plain"/>
+                  </intent>
+              </queries>
+          </manifest>
+          EOF
+
+      - name: Patch Gradle Environment Properties for AGP 9 Compatibility
+        run: |
+          mkdir -p android
+          touch android/gradle.properties
+          echo "android.newDsl=false" >> android/gradle.properties
 
       - name: Synchronize Package Dependencies
         run: flutter pub get
 
+      - name: Hard Upgrade Local Gradle Wrapper to Supported Build Target
+        run: |
+          cd android
+          ./gradlew :wrapper --gradle-version 8.14.0 --distribution-type bin
+
       - name: Compile Production Release Binary Package Artifact
-        run: flutter build apk --release
+        run: flutter build apk --release --android-skip-build-dependency-validation --no-tree-shake-icons
 
       - name: Export Deployable Release APK File to Dashboard
         uses: actions/upload-artifact@v4
