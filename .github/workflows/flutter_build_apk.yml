@@ -34,7 +34,7 @@ jobs:
           channel: 'stable'
           cache: true
           # 🔹 Custom key token to permanently break old container images
-          cache-key: "flutter-cache-key-v2"
+          cache-key: "flutter-cache-key-v3"
 
       - name: Fetch Manifest Remote Dependencies
         run: flutter pub get
