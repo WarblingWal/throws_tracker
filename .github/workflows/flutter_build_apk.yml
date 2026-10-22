@@ -1,43 +1,43 @@
-﻿name: Flutter Automated Build Pipeline
+name: Flutter Production Android Release Compilation Pipeline
 
 on:
   push:
     branches:
       - main
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
-  build:
-    name: Compile Android Release APK
+  compile-release-apk:
     runs-on: ubuntu-latest
     steps:
-      - name: Check out repository source code
+      - name: Checkout Server Code Repository Branch
         uses: actions/checkout@v4
-        with:
-          # 🔹 Forces a fresh, deep fetch of the absolute latest commit tree
-          fetch-depth: 0 
 
-      - name: Initialise Java Environment Matrix
+      - name: Install Stable Java Development Kit
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: '17'
-          # 🔹 Forces GitHub to clear and reconstruct its internal build cache records
-          cache: 'gradle'
 
-      - name: Initialise Stable Flutter SDK Framework
+      - name: Initialise Clean Flutter Framework SDK Instance
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
-          cache: true
-          # 🔹 Custom key token to permanently break old container images
-          cache-key: "flutter-cache-key-v3"
+          cache: false # 👈 Disables the cache fallback system completely
 
-      - name: Fetch Manifest Remote Dependencies
+      # 🧹 FORCE PURGE: Clears out all stale cached Gradle manifests and local artifacts
+      - name: Purge Cache and System Artifacts
+        run: |
+          flutter clean
+          flutter pub cache clean --force
+
+      - name: Synchronize Package Dependencies
         run: flutter pub get
 
-      - name: Compile Production Release Binary
-        run: flutter build apk --release --no-tree-shake-icons --android-skip-build-dependency-validation
+      - name: Compile Production Release Binary Package Artifact
+        run: flutter build apk --release
+
+      - name: Export Deployable Release APK File to Dashboard
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release
+          path: build/app/outputs/flutter-apk/app-release.apk
