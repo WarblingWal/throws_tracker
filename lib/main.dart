@@ -33,6 +33,7 @@ class ThrowEntry {
   final double projectedDistance;
   final String timestamp;
   final String performanceMode;
+  final String techniqueVariant;
 
   const ThrowEntry({
     this.id,
@@ -41,6 +42,7 @@ class ThrowEntry {
     required this.projectedDistance,
     required this.timestamp,
     required this.performanceMode,
+    required this.techniqueVariant,
   });
 }
 
@@ -81,7 +83,9 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
 
   String _activeTimeFilter = "All Time";
   String _activeModeFilter = "All";
+  String _activeTechniqueFilter = "All Techniques";
   String _activeEntryMode = "Training";
+  String _activeTechniqueMode = "Standing Throw";
   int _guideSubTab = 0;
 
   final List<String> _countriesList = [
@@ -118,6 +122,28 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
     'Hammer',
     'Weight'
   ];
+
+  final Map<String, List<String>> _implementTechniqueOptions = {
+    'Discus': ['Standing Throw', 'Half Turn', 'Full Rotation'],
+    'Shot Put': ['Standing Throw', 'Shuffle', 'Glide', 'Rotation'],
+    'Javelin': ['Standing Throw', 'Standard Run Up'],
+    'Hammer': [
+      'Standing Throw',
+      '1 Turn',
+      '2 Turns',
+      '3 Turns',
+      '4 Turns',
+      '5 Turns'
+    ],
+    'Weight': [
+      'Standing Throw',
+      '1 Turn',
+      '2 Turns',
+      '3 Turns',
+      '4 Turns',
+      '5 Turns'
+    ],
+  };
 
   final Map<String, List<ThrowEntry>> _sessionLogs = {
     'Discus': [],
@@ -273,20 +299,31 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
 
     for (String discipline in _disciplines) {
       final throwMaps = await db.getThrowLogs(discipline);
-      List<ThrowEntry> entries = throwMaps
-          .map((m) => ThrowEntry(
-                id: m['id'] as int?,
-                loggedDistance: (m['distance'] as num).toDouble(),
-                activeWeight: _getStandardWeight(discipline, _selectedDivision),
-                projectedDistance: (m['distance'] as num).toDouble(),
-                timestamp: m['dateStamp'] as String? ??
-                    DateTime.now().toIso8601String(),
-                performanceMode: m.containsKey('techniqueVariant') &&
-                        m['techniqueVariant'] == 'Competition'
-                    ? 'Competition'
-                    : 'Training',
-              ))
-          .toList();
+      List<ThrowEntry> entries = throwMaps.map((m) {
+        String rawVariant = m['techniqueVariant'] as String? ?? 'Training';
+        String modeToken = "Training";
+        String techToken = "Standing Throw";
+
+        if (rawVariant.contains('|')) {
+          List<String> splits = rawVariant.split('|');
+          modeToken = splits[0];
+          techToken = splits[1];
+        } else {
+          modeToken = rawVariant == 'Competition' ? 'Competition' : 'Training';
+          techToken = "Standing Throw";
+        }
+
+        return ThrowEntry(
+          id: m['id'] as int?,
+          loggedDistance: (m['distance'] as num).toDouble(),
+          activeWeight: _getStandardWeight(discipline, _selectedDivision),
+          projectedDistance: (m['distance'] as num).toDouble(),
+          timestamp:
+              m['dateStamp'] as String? ?? DateTime.now().toIso8601String(),
+          performanceMode: modeToken,
+          techniqueVariant: techToken,
+        );
+      }).toList();
 
       _sessionLogs[discipline] = entries.reversed.toList();
     }
@@ -341,7 +378,6 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
         pbCounter++;
       }
     }
-
     final DateTime? stableTimestamp = maxTimestamp;
     if (stableTimestamp != null) {
       String dateStr =
@@ -400,6 +436,11 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
     if (_activeModeFilter != "All") {
       workingList = workingList
           .where((t) => t.performanceMode == _activeModeFilter)
+          .toList();
+    }
+    if (_activeTechniqueFilter != "All Techniques") {
+      workingList = workingList
+          .where((t) => t.techniqueVariant == _activeTechniqueFilter)
           .toList();
     }
     final DateTime targetBaselineNow = DateTime.now();
@@ -569,7 +610,7 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                          "• ${t.loggedDistance.toStringAsFixed(2)}m (${t.performanceMode})",
+                          "• ${t.loggedDistance.toStringAsFixed(2)}m (${t.performanceMode} - ${t.techniqueVariant})",
                           style: const TextStyle(fontSize: 12)),
                       Text(
                           t.timestamp.length >= 10
@@ -1192,6 +1233,11 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
     }
     double pb = _lifetimePBs[discipline] ?? 0.0;
     double sb = _seasonsBests[discipline] ?? 0.0;
+    List validTechniques =
+        _implementTechniqueOptions[discipline] ?? ['Standing Throw'];
+    if (!validTechniques.contains(_activeTechniqueMode)) {
+      _activeTechniqueMode = validTechniques.first;
+    }
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
       child: Column(
@@ -1234,6 +1280,52 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
                     "LIFETIME PB", "${pb.toStringAsFixed(2)}m", dynamicAccent),
                 _buildPanelStatNode("SEASONS BEST", "${sb.toStringAsFixed(2)}m",
                     const Color(0xFFEEE3D3)),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+                color: const Color(0xFF1E221F),
+                borderRadius: BorderRadius.circular(8)),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text("BIOMECHANICAL TECHNIQUE SELECTION",
+                    style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey,
+                        letterSpacing: 0.5)),
+                const SizedBox(height: 10),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: validTechniques.map((tech) {
+                      bool active = _activeTechniqueMode == tech;
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 6.0),
+                        child: ChoiceChip(
+                          label: Text(tech,
+                              style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: active ? Colors.black : Colors.white)),
+                          selected: active,
+                          selectedColor: dynamicAccent,
+                          backgroundColor: const Color(0xFF2C302E),
+                          onSelected: (val) {
+                            if (val) {
+                              setState(() => _activeTechniqueMode = tech);
+                            }
+                          },
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
               ],
             ),
           ),
@@ -1385,9 +1477,11 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
                         double.tryParse(_distanceFieldController.text) ?? 0.0;
                     if (loggedDist > 0.0 && _currentActiveUser != null) {
                       FocusScope.of(context).unfocus();
+                      String packedVariant =
+                          "$_activeEntryMode|$_activeTechniqueMode";
                       await DatabaseHelper.instance.insertThrowLog(
                         discipline,
-                        _activeEntryMode,
+                        packedVariant,
                         loggedDist,
                         DateTime.now().toIso8601String(),
                       );
@@ -1435,7 +1529,7 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
                 style:
                     const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
             subtitle: Text(
-                "Weight: ${item.activeWeight.toStringAsFixed(1)}${discipline == 'Javelin' ? 'g' : 'kg'}${hasOverride ? ' (Custom Override)' : ''}",
+                "Style: ${item.techniqueVariant} | Wt: ${item.activeWeight.toStringAsFixed(1)}${discipline == 'Javelin' ? 'g' : 'kg'}",
                 style: const TextStyle(fontSize: 11, color: Color(0xFF909499))),
             trailing: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -1472,6 +1566,13 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
       "Last Month",
       "Last Year"
     ];
+    List validTechniques = [
+      "All Techniques",
+      ...(_implementTechniqueOptions[discipline] ?? [])
+    ];
+    if (!validTechniques.contains(_activeTechniqueFilter)) {
+      _activeTechniqueFilter = "All Techniques";
+    }
     return CustomScrollView(
       slivers: [
         SliverPadding(
@@ -1505,8 +1606,34 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
                   ),
                 ),
               ),
+              const SizedBox(height: 8),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: validTechniques.map((techName) {
+                    bool isSelected = _activeTechniqueFilter == techName;
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 6.0),
+                      child: ChoiceChip(
+                        label: Text(techName,
+                            style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color:
+                                    isSelected ? Colors.black : Colors.grey)),
+                        selected: isSelected,
+                        selectedColor: dynamicAccent.withOpacity(0.8),
+                        backgroundColor: const Color(0xFF1E221F),
+                        onSelected: (s) =>
+                            setState(() => _activeTechniqueFilter = techName),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
               const SizedBox(height: 16),
-              Text("${_activeTimeFilter.toUpperCase()} ANALYTICS MATRIX GRAPH",
+              Text(
+                  "${_activeTimeFilter.toUpperCase()} ANALYTICS MATRIX GRAPH ($_activeTechniqueFilter)",
                   style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
@@ -1524,7 +1651,7 @@ class _MainNavigationHubState extends State<MainNavigationHub> {
                 child: filteredFeed.isEmpty
                     ? const Center(
                         child: Text(
-                            "No records caught inside this date frame window.",
+                            "No records caught inside this date frame window filter configuration.",
                             style: TextStyle(fontSize: 11, color: Colors.grey)))
                     : CustomPaint(
                         painter: TrainingLineChartPainter(
