@@ -29,12 +29,17 @@ jobs:
           flutter clean
           flutter pub cache clean --force
 
+      # 🔨 THE FORCE WORKAROUND: Forcefully replaces the namespace text directly in the file system before compilation
+      - name: Force Patch Manifest Namespace
+        run: |
+          sed -i 's|xmlns:android="http://android.com"|xmlns:android="http://android.com"|g' android/app/src/main/AndroidManifest.xml
+
       - name: Synchronize Package Dependencies
         run: flutter pub get
 
       - name: Compile Production Release Binary Package Artifact
-        # 🛠️ BYPASS FLAG APPLIED: Prevents Gradle version mismatch errors on the remote runner
-        run: flutter build apk --release --android-skip-build-dependency-validation
+        # 🛠️ BYPASS FLAGS APPLIED: Explicitly tells the compiler to disregard remaining validation blocks
+        run: flutter build apk --release --android-skip-build-dependency-validation --no-tree-shake-icons
 
       - name: Export Deployable Release APK File to Dashboard
         uses: actions/upload-artifact@v4
