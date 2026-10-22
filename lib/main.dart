@@ -1,29 +1,12 @@
-import 'dart:io' as io;
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'database_helper.dart';
 
-// 🛠️ Programmatic patch to fix any dynamic stripping during compilation
-void fixManifestBeforeBuild() {
-  final io.File manifestFile =
-      io.File('android/app/src/main/AndroidManifest.xml');
-  if (manifestFile.existsSync()) {
-    String content = manifestFile.readAsStringSync();
-
-    // Forcibly rewrite raw keys back into standard prefixed attributes
-    content = content.replaceAll(
-        'uses-permission name=', 'uses-permission android:name=');
-    content = content.replaceAll('<activity name=', '<activity android:name=');
-    content =
-        content.replaceAll('<meta-data name=', '<meta-data android:name=');
-    content = content.replaceAll('<action name=', '<action android:name=');
-    content = content.replaceAll('<category name=', '<category android:name=');
-
-    manifestFile.writeAsStringSync(content);
-  }
+void main() {
+  // Ensures all native channels are bound securely before the layout framework spins up
+  WidgetsFlutterBinding.ensureInitialized();
+  runApp(const ThrowsTrackerApp());
 }
-
-void main() => runApp(const ThrowsTrackerApp());
 
 class ThrowsTrackerApp extends StatelessWidget {
   const ThrowsTrackerApp({super.key});
@@ -31,6 +14,8 @@ class ThrowsTrackerApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+// ... keep everything else exactly the same below this line
+
       title: 'Throws Hub Pro',
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark().copyWith(
