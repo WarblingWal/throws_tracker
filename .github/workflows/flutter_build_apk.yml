@@ -1,4 +1,4 @@
-name: Flutter Production Android Release Compilation Pipeline
+﻿name: Flutter Production Android Release Compilation Pipeline
 
 on:
   push:
@@ -22,24 +22,13 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
-          cache: false
-
-      - name: Purge Cache and System Artifacts
-        run: |
-          flutter clean
-          flutter pub cache clean --force
-
-      # 🔨 THE FORCE WORKAROUND: Forcefully replaces the namespace text directly in the file system before compilation
-      - name: Force Patch Manifest Namespace
-        run: |
-          sed -i 's|xmlns:android="http://android.com"|xmlns:android="http://android.com"|g' android/app/src/main/AndroidManifest.xml
+          cache: false # 👈 CRITICAL FIX: Disables the cache fallback system completely
 
       - name: Synchronize Package Dependencies
         run: flutter pub get
 
       - name: Compile Production Release Binary Package Artifact
-        # 🛠️ BYPASS FLAGS APPLIED: Explicitly tells the compiler to disregard remaining validation blocks
-        run: flutter build apk --release --android-skip-build-dependency-validation --no-tree-shake-icons
+        run: flutter build apk --release
 
       - name: Export Deployable Release APK File to Dashboard
         uses: actions/upload-artifact@v4
