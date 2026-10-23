@@ -47,7 +47,7 @@ jobs:
                       
                       <meta-data
                           android:name="io.flutter.embedding.android.NormalTheme"
-                          **android:resource="@style/NormalTheme"** />
+                          android:resource="@style/NormalTheme" />
                         
                       <intent-filter>
                           <action android:name="android.intent.action.MAIN"/>
@@ -78,14 +78,14 @@ jobs:
       - name: Synchronize Package Dependencies
         run: flutter pub get
 
-      - name: Self-Heal and Generate Missing Gradle Wrapper Files
+      - name: Self-Heal and Generate Missing Gradle Wrapper Files with Skip Flags
         run: |
           cd android
           if [ ! -f gradlew ]; then
             echo "⚠️ gradlew file was missing from repository source. Initialising wrapper binaries..."
-            gradle wrapper --gradle-version 8.14.0 --distribution-type bin
+            gradle wrapper --gradle-version 8.14.0 --distribution-type bin --warning-mode none
           else
-            ./gradlew :wrapper --gradle-version 8.14.0 --distribution-type bin
+            ./gradlew :wrapper --gradle-version 8.14.0 --distribution-type bin --warning-mode none
           fi
           chmod +x gradlew
 
